@@ -99,6 +99,25 @@ RSpec.describe 'rendering inertia views', type: :request do
     end
   end
 
+  context 'partial except rendering' do
+    let(:page) {
+      InertiaRails::Renderer.new('TestComponent', controller, request, response, '', props: { name: "Brandon", sport: 'hockey' }).send(:page)
+    }
+    let(:headers) {{
+      'X-Inertia' => true,
+      'X-Inertia-Partial-Data' => 'sport,name',
+      'X-Inertia-Partial-Except' => 'sport',
+      'X-Inertia-Partial-Component' => 'TestComponent',
+    }}
+
+    context 'with partial except header' do
+      before { get props_path, headers: headers }
+      it { is_expected.to eq page.to_json }
+      it { is_expected.to include('Brandon') }
+      it { is_expected.to_not include('hockey') }
+    end
+  end
+
   context 'lazy prop rendering' do
     context 'on first load' do
       let(:page) {

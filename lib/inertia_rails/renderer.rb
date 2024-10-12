@@ -72,7 +72,7 @@ module InertiaRails
     def computed_props
       _props = merge_props(shared_data, props).select do |key, prop|
         if rendering_partial_component?
-          key.in?(partial_keys) || prop.is_a?(AlwaysProp)
+          (key.in?(partial_keys) || prop.is_a?(AlwaysProp)) && !key.in?(partial_except_keys)
         else
           !prop.is_a?(IgnoreFirstLoadProp)
         end
@@ -129,6 +129,10 @@ module InertiaRails
 
     def partial_keys
       @partial_keys ||= (@request.headers['X-Inertia-Partial-Data'] || '').split(',').compact.map(&:to_sym)
+    end
+
+    def partial_except_keys
+      @partial_expected_keys ||= (@request.headers['X-Inertia-Partial-Except'] || '').split(',').compact.map(&:to_sym)
     end
 
     def reset_keys
