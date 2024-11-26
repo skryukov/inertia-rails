@@ -87,7 +87,7 @@ module InertiaRails
     end
 
     def prop_transformer
-      @prop_transformer ||= PropTransformer.new(controller)
+      @prop_transformer ||= PropTransformer.new(controller, configuration)
         .select_transformed(merged_props){ |prop, path| keep_prop?(prop, path) }
     end
 
@@ -148,26 +148,23 @@ module InertiaRails
     end
 
     def validate_partial_reload_optimization
-      if prop_transformer.unoptimized_prop_paths.any?
-        case configuration.action_on_unoptimized_partial_reload
-        when :log
-          ActiveSupport::Notifications.instrument(
-            'inertia_rails.unoptimized_partial_render',
-            paths: prop_transformer.unoptimized_prop_paths,
-            controller: controller,
-            action: controller.action_name,
-          )
-        when :raise
-          raise InertiaRails::UnoptimizedPartialReload.new(prop_transformer.unoptimized_prop_paths)
-        end
-      end
+      return unless prop_transformer.unoptimized_prop_paths.any?
+
+      ActiveSupport::Notifications.instrument(
+        'inertia_rails.unoptimized_partial_render',
+        paths: prop_transformer.unoptimized_prop_paths,
+        controller: controller,
+        action: controller.action_name,
+        configuration: configuration,
+      )
     end
 
     class PropTransformer
       attr_reader :props, :unoptimized_prop_paths
 
-      def initialize(controller)
+      def initialize(controller, configuration)
         @controller = controller
+        @configuration = configuration
         @unoptimized_prop_paths = []
         @props = {}
       end
@@ -190,7 +187,7 @@ module InertiaRails
             transformed_props.merge!(key => nested) unless nested.empty?
           elsif block.call(prop, current_path)
             transformed_props.merge!(key => transform_prop(prop))
-          elsif !prop.respond_to?(:call)
+          elsif !prop.respond_to?(:call) && @configuration.action_on_unoptimized_partial_reload
             track_unoptimized_prop(current_path)
           end
 

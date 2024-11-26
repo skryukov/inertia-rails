@@ -169,7 +169,20 @@ RSpec.describe 'Inertia configuration', type: :request do
       }}
 
       it 'logs a warning' do
-        expect(Rails.logger).to receive(:debug).with(/flat, nested\.second/)
+        expect(Rails.logger).to receive(:debug).with(/"flat, nested\.second"/)
+        get except_props_path, headers: headers
+      end
+    end
+
+    context 'another case' do
+      let(:headers) {{
+        'X-Inertia' => true,
+        'X-Inertia-Partial-Data' => 'flat,nested.first',
+        'X-Inertia-Partial-Component' => 'TestComponent',
+      }}
+
+      it 'logs a warning' do
+        expect(Rails.logger).to receive(:debug).with(/"nested\.second"/)
         get except_props_path, headers: headers
       end
     end
@@ -186,7 +199,7 @@ RSpec.describe 'Inertia configuration', type: :request do
       }}
 
       it 'raises an exception' do
-        expect { get except_props_path, headers: headers }.to raise_error(InertiaRails::UnoptimizedPartialReload).with_message(/flat, nested\.second/)
+        expect { get except_props_path, headers: headers }.to raise_error(InertiaRails::UnoptimizedPartialReloadError).with_message(/flat, nested\.second/)
       end
     end
 
@@ -195,10 +208,29 @@ RSpec.describe 'Inertia configuration', type: :request do
         InertiaRails.configure {|c| c.action_on_unoptimized_partial_reload = :unknown}
       end
 
-      it 'does nothing' do
-        expect(Rails.logger).not_to receive(:debug)
+      it 'raises an exception' do
+        expect { get except_props_path, headers: headers }.to raise_error(ArgumentError)
+      end
+    end
+
+    context "with lambda" do
+      let(:handler) { double }
+      before do
+        allow(handler).to receive(:call) { |event|
+          expect(event.payload[:paths]).to eq %w[flat nested.second]
+        }
+
+        InertiaRails.configure do |c|
+          c.action_on_unoptimized_partial_reload = handler
+        end
+      end
+
+      it "calls the lambda" do
+        expect(handler).to receive(:call)
+
         get except_props_path, headers: headers
       end
+
     end
   end
 end

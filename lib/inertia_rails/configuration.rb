@@ -68,6 +68,10 @@ module InertiaRails
       @options[:component_path_resolver].call(path:, action:)
     end
 
+    def action_on_unoptimized_partial_reload
+      @options[:action_on_unoptimized_partial_reload]
+    end
+
     OPTION_NAMES.each do |option|
       define_method(option) {
         evaluate_option @options[option]

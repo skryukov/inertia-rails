@@ -21,7 +21,32 @@ end
 
 module InertiaRails
   class Error < StandardError; end
-  class UnoptimizedPartialReload < StandardError
+
+  class UnoptimizedPartialReloadHandler
+    def call(*args)
+      event = ActiveSupport::Notifications::Event.new(*args)
+      action = event.payload[:configuration].action_on_unoptimized_partial_reload
+      return unless action
+
+      message =
+        "InertiaRails: The \"#{event.payload[:paths].join(', ')}\" " \
+          "prop(s) were excluded in a partial reload but still evaluated because they are defined as values. " \
+          "Consider wrapping them in something callable like a lambda."
+
+      case action
+      when :log
+        Rails.logger.debug(message)
+      when :raise
+        raise InertiaRails::UnoptimizedPartialReloadError.new(event.payload[:paths])
+      else
+        return action.call(event) if action.respond_to?(:call)
+
+        raise ArgumentError, "Unknown action for InertiaRails: #{action.inspect}"
+      end
+    end
+  end
+
+  class UnoptimizedPartialReloadError < StandardError
     attr_reader :paths
 
     def initialize(paths)
