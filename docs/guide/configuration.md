@@ -34,7 +34,7 @@ end
 
 Inertia Rails supports setting any configuration option via environment variables out of the box. For each option in the configuration, you can set an environment variable prefixed with `INERTIA_` and the option name in uppercase. For example: `INERTIA_SSR_ENABLED`.
 
-**Boolean values** (like `INERTIA_DEEP_MERGE_SHARED_DATA` or `INERTIA_SSR_ENABLED`) are parsed from the strings `"true"` or `"false"` (case-sensitive).
+**Boolean values** (like `INERTIA_DEEP_MERGE_SHARED_DATA` or `INERTIA_SSR_ENABLED`) are parsed from the strings `"true"`/`"false"`, `"1"`/`"0"`, `"yes"`/`"no"` and `"on"`/`"off"` (case-insensitive). Options whose default is a number are parsed as numbers.
 
 ## Configuration Options
 

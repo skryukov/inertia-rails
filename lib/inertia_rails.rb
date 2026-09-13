@@ -5,9 +5,13 @@ require 'digest/md5'
 require 'json'
 require 'net/http'
 
+# the framework-agnostic core
+require_relative 'inertia/core'
+
 # modules
 require_relative 'inertia_rails/version'
 require_relative 'inertia_rails/configuration'
+require_relative 'inertia_rails/core_host'
 require_relative 'inertia_rails/current'
 require_relative 'inertia_rails/errors'
 
@@ -59,7 +63,13 @@ module InertiaRails
       @configuration ||= Configuration.default
     end
 
-    def cache_store
+    # The core's view of Rails: one per process, handed to every resolution.
+    def host
+      @host ||= CoreHost.new
+    end
+
+    # The store a configuration names, `Rails.cache` by default.
+    def cache_store(configuration = self.configuration)
       configuration.cache_store
     end
 

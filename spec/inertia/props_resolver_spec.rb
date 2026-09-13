@@ -713,7 +713,7 @@ RSpec.describe InertiaRails::PropsResolver do
       skip('Requires Rails 7.0 or higher') if Rails.version < '7'
 
       error = RuntimeError.new('boom')
-      expect(Rails.error).to receive(:report).with(error, handled: true)
+      expect(Rails.error).to receive(:report).with(error, handled: true, context: { prop: 'permissions' })
 
       resolve_partial(
         { permissions: InertiaRails.defer(rescue: true) { raise error } },

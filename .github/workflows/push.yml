@@ -77,6 +77,10 @@ jobs:
         env:
           RAILS_VERSION: ${{ matrix.rails }}
 
+      # The core's promise: it loads and runs on plain Ruby, without Rails.
+      - name: Run the core suite without Rails
+        run: bundle exec rspec -O spec/core/.rspec spec/core
+
       - name: Run Minitest
         run: bundle exec rake test
         env:

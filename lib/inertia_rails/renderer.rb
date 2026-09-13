@@ -46,11 +46,9 @@ module InertiaRails
     def render
       ActiveSupport::Notifications.instrument('render.inertia_rails',
                                               component: @component, partial: partial_reload?, ssr: false) do |payload|
-        vary = @response.headers['Vary'].to_s.split(',').map(&:strip).reject(&:empty?)
-        vary << 'X-Inertia' if vary.none? { |value| value.casecmp?('X-Inertia') }
-        @response.headers['Vary'] = vary.join(', ')
+        @response.headers['Vary'] = Inertia::Core::Protocol.vary(@response.headers['Vary'])
         if @request.inertia?
-          @response.set_header('X-Inertia', 'true')
+          @response.set_header(Inertia::Core::Protocol::HEADER, 'true')
           @render_method.call json: page.to_json, status: @response.status, content_type: Mime[:json]
         else
           ssr = @configuration.ssr_enabled && ssr_render
@@ -144,22 +142,18 @@ module InertiaRails
       # Add meta tags (never transformed by prop_transformer)
       merge_meta_tags!(resolved_props)
 
-      page = {
+      Inertia::Core::Page.new(
         component: @component,
         props: resolved_props,
         url: @request.original_fullpath,
         version: @configuration.version,
-        encryptHistory: @encrypt_history,
-        clearHistory: @clear_history,
-      }
-
-      flash_data = @controller.__send__(:inertia_collect_flash_data)
-      page[:flash] = flash_data if flash_data.present?
-
-      page[:sharedProps] = @shared_keys if @shared_keys&.any?
-      page[:preserveFragment] = @preserve_fragment if @preserve_fragment
-
-      page.merge!(metadata)
+        encrypt_history: @encrypt_history,
+        clear_history: @clear_history,
+        flash: @controller.__send__(:inertia_collect_flash_data),
+        shared_keys: @shared_keys,
+        preserve_fragment: @preserve_fragment,
+        metadata: metadata
+      ).to_h
     end
 
     def resolve_component(component)

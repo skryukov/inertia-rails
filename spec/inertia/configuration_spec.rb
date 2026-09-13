@@ -53,65 +53,6 @@ RSpec.describe 'Inertia configuration', type: :request do
           expect(controller_config.deep_merge_shared_data).to eq true
         end
       end
-
-      it 'raises for invalid xsrf_cookie_refresh values when read' do
-        config = InertiaRails::Configuration.new(xsrf_cookie_refresh: :sometimes)
-
-        expect do
-          config.xsrf_cookie_refresh
-        end.to raise_error(ArgumentError, /Invalid xsrf_cookie_refresh/)
-      end
-
-      it 'raises for invalid INERTIA_XSRF_COOKIE_REFRESH env values when read' do
-        with_env('INERTIA_XSRF_COOKIE_REFRESH' => 'garbage') do
-          config = InertiaRails::Configuration.default
-
-          expect do
-            config.xsrf_cookie_refresh
-          end.to raise_error(ArgumentError, /Invalid xsrf_cookie_refresh/)
-        end
-      end
-    end
-
-    describe '#head_attribute' do
-      it 'defaults to :inertia' do
-        expect(InertiaRails::Configuration.default.head_attribute).to eq :inertia
-      end
-
-      it 'returns :"data-inertia" when use_data_inertia_head_attribute is enabled' do
-        config = InertiaRails::Configuration.default
-        config.use_data_inertia_head_attribute = true
-
-        expect(config.head_attribute).to eq :'data-inertia'
-      end
-
-      it 'returns :"data-inertia" when server_head is enabled, regardless of use_data_inertia_head_attribute' do
-        config = InertiaRails::Configuration.default
-        config.server_head = true
-        config.use_data_inertia_head_attribute = false
-
-        expect(config.head_attribute).to eq :'data-inertia'
-      end
-    end
-
-    describe '#meta_prop' do
-      it 'is :_inertia_meta when server_head is disabled' do
-        expect(InertiaRails::Configuration.default.meta_prop).to eq :_inertia_meta
-      end
-
-      it 'is :head when server_head is true' do
-        config = InertiaRails::Configuration.default
-        config.server_head = true
-
-        expect(config.meta_prop).to eq :head
-      end
-
-      it 'is the configured name when server_head is a string' do
-        config = InertiaRails::Configuration.default
-        config.server_head = 'custom_meta'
-
-        expect(config.meta_prop).to eq :custom_meta
-      end
     end
   end
 

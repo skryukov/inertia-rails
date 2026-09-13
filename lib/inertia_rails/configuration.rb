@@ -1,221 +1,53 @@
 # frozen_string_literal: true
 
 module InertiaRails
-  class Configuration
+  # The core knobs plus the Rails-only ones; a callable value is evaluated inside
+  # the bound controller.
+  class Configuration < Inertia::Core::Configuration
     DEFAULT_SSR_URL = 'http://localhost:13714'
-    XSRF_COOKIE_REFRESH_OPTIONS = %i[always lazy].freeze
+    XSRF_COOKIE_REFRESH_OPTIONS = XSRF_COOKIE_REFRESH_POLICIES
 
-    DEFAULTS = {
-      # Whether to combine hashes with the same keys instead of replacing them.
-      deep_merge_shared_data: false,
+    # Overrides Rails default rendering behavior to render using Inertia by default.
+    option :default_render, false
 
-      # Overrides Rails default rendering behavior to render using Inertia by default.
-      default_render: false,
+    # DEPRECATED: Let Rails decide which layout should be used based on the
+    # controller configuration.
+    option :layout, true
 
-      # Allows the user to hook into the default rendering behavior and change it to fit their needs
-      component_path_resolver: ->(path:, action:) { "#{path}/#{action}" },
+    # Allows configuring the base controller for StaticController.
+    option :parent_controller, '::ApplicationController'
 
-      # A function that transforms the props before they are sent to the client.
-      prop_transformer: ->(props:) { props },
+    # Flash keys from Rails flash to expose to frontend.
+    # Set to nil to disable Rails flash integration (use only flash.inertia).
+    option :flash_keys, %i[notice alert].freeze
 
-      # DEPRECATED: Let Rails decide which layout should be used based on the
-      # controller configuration.
-      layout: true,
+    # Whether to prevent database writes during precognition requests.
+    # When enabled, any ActiveRecord write during a precognition request
+    # will raise ActiveRecord::ReadOnlyError.
+    option :precognition_prevent_writes, false
 
-      # Whether to encrypt the history state in the client.
-      encrypt_history: false,
+    # Cache store for prop-level caching and SSR response caching; `Rails.cache` when nil.
+    option :cache_store, nil, evaluate: false
 
-      # SSR options.
-      ssr_enabled: false,
-      # URL of the SSR server. When nil, defaults to DEFAULT_SSR_URL.
-      ssr_url: nil,
-      ssr_raise_on_error: false,
-      on_ssr_error: nil,
-      # Path(s) to check for SSR bundle existence before attempting SSR.
-      # Set to nil to skip bundle detection (always attempt SSR when enabled).
-      # Can be a String path or an Array of paths — SSR proceeds if any file exists.
-      ssr_bundle: nil,
-      # Cache SSR responses to avoid redundant renders for identical pages.
-      # Accepts true, false/nil, or a Hash of Rails.cache.fetch options.
-      # Lambdas are supported (instance_exec'd in controller context).
-      ssr_cache: nil,
-      # JavaScript runtime used to run the SSR bundle (e.g. "node", "bun", "deno").
-      # When nil, auto-detects from lockfiles or falls back to "node".
-      ssr_runtime: nil,
+    DEFAULTS = options.freeze
+    OPTION_NAMES = option_names.freeze
 
-      # Used to detect version drift between server and client.
-      version: nil,
-
-      # Allows configuring the base controller for StaticController.
-      parent_controller: '::ApplicationController',
-
-      # Whether to include empty `errors` hash to the props when no errors are present.
-      always_include_errors_hash: nil,
-
-      # When to refresh the XSRF token cookie on protected requests.
-      xsrf_cookie_refresh: :always,
-
-      # Whether to convert cross-origin redirects into Inertia location responses.
-      convert_external_redirects: true,
-
-      # Whether to use `<script>` element for initial page rendering instead of the `data-page` attribute.
-      use_script_element_for_initial_page: false,
-
-      # Whether to use `data-inertia` attribute instead of `inertia` for meta tags.
-      use_data_inertia_head_attribute: false,
-
-      # Whether to serialize meta tags as HTML strings for the `serverHead` option
-      # of `createInertiaApp` (Inertia.js v3.5+). A String sets a custom prop name.
-      server_head: false,
-
-      # Callable applied to the page `<title>` meta tag. Receives the current
-      # title (or nil when none is set) and returns the full title, so it can
-      # also provide a default for pages without one.
-      meta_title_template: nil,
-
-      # DOM id to use for the root Inertia.js element.
-      root_dom_id: 'app',
-
-      # Flash keys from Rails flash to expose to frontend.
-      # Set to nil to disable Rails flash integration (use only flash.inertia).
-      flash_keys: %i[notice alert].freeze,
-
-      # Whether to prevent database writes during precognition requests.
-      # When enabled, any ActiveRecord write during a precognition request
-      # will raise ActiveRecord::ReadOnlyError.
-      precognition_prevent_writes: false,
-
-      # Whether to include shared prop keys in the page response metadata.
-      expose_shared_prop_keys: true,
-
-      # Cache store for prop-level caching and SSR response caching.
-      # Defaults to Rails.cache when nil.
-      cache_store: nil,
-    }.freeze
-
-    OPTION_NAMES = DEFAULTS.keys.freeze
-
-    class << self
-      def default
-        new(**DEFAULTS, **env_options)
-      end
-
-      private
-
-      def env_options
-        DEFAULTS.keys.each_with_object({}) do |key, hash|
-          value = ENV.fetch("INERTIA_#{key.to_s.upcase}", nil)
-          next if value.nil?
-
-          hash[key] = %w[true false].include?(value) ? value == 'true' : value
-        end
-      end
-    end
-
-    protected attr_reader :controller
-    protected attr_reader :options
-
-    def initialize(controller: nil, **attrs)
-      @controller = controller
-      @options = attrs.extract!(*OPTION_NAMES)
-
-      return if attrs.empty?
-
-      raise ArgumentError, "Unknown options for #{self.class}: #{attrs.keys}"
+    def initialize(controller: nil, context: controller, **attrs)
+      super(context: context, **attrs)
     end
 
     def bind_controller(controller)
-      Configuration.new(**@options, controller: controller)
-    end
-
-    def freeze
-      @options.freeze
-      super
-    end
-
-    def merge!(config)
-      @options.merge!(config.options)
-      self
-    end
-
-    def merge(config)
-      Configuration.new(**@options, **config.options)
-    end
-
-    # Internal: Finalizes the configuration for a specific controller.
-    def with_defaults(config)
-      @options = config.options.merge(@options)
-      freeze
-    end
-
-    def component_path_resolver(path:, action:)
-      @options[:component_path_resolver].call(path: path, action: action)
-    end
-
-    def prop_transformer(props:)
-      @options[:prop_transformer].call(props: props)
-    end
-
-    # Returns the callable without evaluating it — called with (error, page) by the renderer.
-    def on_ssr_error
-      @options[:on_ssr_error]
+      bind(controller)
     end
 
     def cache_store
-      @options[:cache_store] || Rails.cache
+      super || Rails.cache
     end
 
-    # Normalized and validated at read time — ENV values arrive as strings, and callables are only evaluated here.
-    def xsrf_cookie_refresh
-      value = evaluate_option(options[:xsrf_cookie_refresh])
-      value = value.to_sym if value.respond_to?(:to_sym)
-      return value if XSRF_COOKIE_REFRESH_OPTIONS.include?(value)
+    protected
 
-      raise ArgumentError,
-            "Invalid xsrf_cookie_refresh: #{value.inspect}. " \
-            "Expected one of: #{XSRF_COOKIE_REFRESH_OPTIONS.map(&:inspect).join(', ')}"
-    end
-
-    # Inertia.js v3's `serverHead` only recognizes `data-inertia`.
-    def head_attribute
-      server_head || use_data_inertia_head_attribute ? :'data-inertia' : :inertia
-    end
-
-    # `head` is the prop the client reads for `serverHead: true`.
-    def meta_prop
-      value = server_head
-      return :_inertia_meta unless value
-
-      value == true ? :head : value.to_sym
-    end
-
-    # Returned without evaluating — the callable takes the current title as an
-    # argument, so the renderer applies it instead of `evaluate_option`.
-    def meta_title_template
-      value = options[:meta_title_template]
-      return value if value.nil? || value.respond_to?(:call)
-
-      raise ArgumentError, "meta_title_template must be callable, got #{value.inspect}"
-    end
-
-    OPTION_NAMES.each do |option|
-      unless method_defined?(option)
-        define_method(option) do
-          evaluate_option options[option]
-        end
-      end
-      define_method("#{option}=") do |value|
-        @options[option] = value
-      end
-    end
-
-    private
-
-    def evaluate_option(value)
-      return value unless value.respond_to?(:call)
-      return value.call unless controller
-
-      controller.instance_exec(&value)
+    def controller
+      context
     end
   end
 end

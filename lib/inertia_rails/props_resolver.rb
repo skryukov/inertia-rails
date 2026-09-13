@@ -130,7 +130,7 @@ module InertiaRails
         rescue StandardError => e
           raise unless rescue_enabled
 
-          report_rescued_error(e)
+          InertiaRails.host.report_error(e, prop: path)
           @_rescued << path
           next
         end
@@ -165,16 +165,6 @@ module InertiaRails
       when Hash then value.any? { |_, v| needs_transform?(v) }
       when Array then value.any? { |v| needs_transform?(v) }
       else value.respond_to?(:to_inertia)
-      end
-    end
-
-    def report_rescued_error(error)
-      # `Rails.error` (the Error Reporter) was introduced in Rails 7.0. Fall back
-      # to the logger on older versions so rescued errors are never silently lost.
-      if Rails.respond_to?(:error)
-        Rails.error.report(error, handled: true)
-      else
-        Rails.logger&.error("[inertia-rails] Rescued deferred prop error: #{error.class}: #{error.message}")
       end
     end
 

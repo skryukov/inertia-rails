@@ -25,15 +25,14 @@ module InertiaRails
     def call(controller, **context)
       return super unless cached?
 
-      json = InertiaRails.cache_store.fetch(@cache_key, **(@cache_options || {})) { super.to_json }
+      json = InertiaRails.host.cache_store.fetch(@cache_key, **(@cache_options || {})) { super.to_json }
       RawJson.new(json)
     end
 
     private
 
     def derive_cache_key(raw_key)
-      expanded = ActiveSupport::Cache.expand_cache_key(raw_key)
-      "inertia_rails/#{expanded}"
+      InertiaRails.host.expand_cache_key(raw_key)
     end
   end
 end
