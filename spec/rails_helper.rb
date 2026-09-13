@@ -56,6 +56,9 @@ RSpec.configure do |config|
 
   config.include HelperModule
   config.include ActiveSupport::Testing::TimeHelpers
+  # Untyped example groups get no minitest teardown, so a blockless `travel`
+  # would leave `Time.now` frozen for the rest of the run.
+  config.after { travel_back }
 end
 
 require 'rails-controller-testing'
