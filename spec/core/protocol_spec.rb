@@ -69,5 +69,11 @@ RSpec.describe Inertia::Core::Protocol do
       expect(described_class.external?('https://app.test:8443/x', **origin)).to be true
       expect(described_class.external?('http://[bad', **origin)).to be false
     end
+
+    it 'compares an IPv6 host without its brackets' do
+      origin = { scheme: 'http', host: '::1', port: 3000 }
+      expect(described_class.external?('http://[::1]:3000/x', **origin)).to be false
+      expect(described_class.external?('http://[::2]:3000/x', **origin)).to be true
+    end
   end
 end

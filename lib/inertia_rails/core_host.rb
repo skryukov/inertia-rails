@@ -27,9 +27,11 @@ module InertiaRails
 
     # Rails < 7.0 has no Error Reporter, so log instead of losing the error.
     def report_error(error, **context)
+      Rails.logger&.error("[inertia-rails] SSR render failed: #{error.message}") if context[:ssr]
+
       if Rails.respond_to?(:error)
         Rails.error.report(error, handled: true, context: context)
-      else
+      elsif !context[:ssr]
         Rails.logger&.error("[inertia-rails] Rescued deferred prop error: #{error.class}: #{error.message}")
       end
     end

@@ -77,7 +77,7 @@ module InertiaRails
     private
 
     def ssr_render
-      SSRRenderer.new(@configuration, page: page, cache: @ssr_cache).render
+      Inertia::Core::SSR::Client.new(@configuration, page: page, host: InertiaRails.host, cache: @ssr_cache).render
     end
 
     def layout

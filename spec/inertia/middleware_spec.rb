@@ -88,6 +88,19 @@ RSpec.describe 'InertiaRails::Middleware', type: :request do
       expect(request.session.loaded?).to be(true)
       expect(session[:inertia_errors]).to be_nil
     end
+
+    # Rails 6.1 hands a bare env without a session middleware a plain Hash,
+    # which has no `loaded?` to ask.
+    it 'leaves a session that cannot say whether it was loaded alone' do
+      app = ->(_env) { [200, { 'content-type' => 'text/plain' }, ['ok']] }
+      session = { inertia_errors: { name: 'taken' } }
+      env = Rack::MockRequest.env_for('http://www.example.com/articles', 'rack.session' => session)
+
+      status, = InertiaRails::Middleware.new(app).call(env)
+
+      expect(status).to eq 200
+      expect(session).to eq(inertia_errors: { name: 'taken' })
+    end
   end
 
   context 'inertia session options with explicit redirect statuses' do
@@ -393,8 +406,10 @@ RSpec.describe 'InertiaRails::Middleware', type: :request do
       status, response_headers, response_body = InertiaRails::Middleware.new(app).call(env)
 
       expect(status).to eq 409
-      expect(response_headers).to eq('X-Inertia-Location' => 'http://external-website.com/some_path',
-                                     'Set-Cookie' => 'key=value')
+      # Rack 3 wants lowercase response header names, Rack 2 takes them as
+      # written, so the name the middleware wrote is compared case-blind.
+      expect(response_headers.transform_keys(&:downcase))
+        .to eq('x-inertia-location' => 'http://external-website.com/some_path', 'set-cookie' => 'key=value')
       expect(response_body).to eq []
       expect(body.closed?).to be true
     end

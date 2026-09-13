@@ -8,6 +8,10 @@ require_relative 'core/host'
 require_relative 'core/configuration'
 require_relative 'core/protocol'
 require_relative 'core/page'
+require_relative 'core/ssr/client'
+require_relative 'core/rack'
+require_relative 'core/rack/request'
+require_relative 'core/rack/middleware'
 
 module Inertia
   # The framework-agnostic half of the Inertia protocol: the decisions every

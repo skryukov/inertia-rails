@@ -1,9 +1,7 @@
 # frozen_string_literal: true
 
 # stdlib
-require 'digest/md5'
 require 'json'
-require 'net/http'
 
 # the framework-agnostic core
 require_relative 'inertia/core'
@@ -40,7 +38,6 @@ require_relative 'inertia_rails/ssr'
 # rendering
 require_relative 'inertia_rails/meta_tag'
 require_relative 'inertia_rails/meta_tag_builder'
-require_relative 'inertia_rails/ssr_renderer'
 require_relative 'inertia_rails/renderer'
 
 # rails integration
@@ -49,7 +46,7 @@ require_relative 'inertia_rails/helper'
 require_relative 'inertia_rails/precognition'
 require_relative 'inertia_rails/xsrf_cookie_refresh_policy'
 require_relative 'inertia_rails/controller'
-require_relative 'inertia_rails/request_origin'
+require_relative 'inertia_rails/protocol_request'
 require_relative 'inertia_rails/middleware'
 require_relative 'inertia_rails/engine'
 

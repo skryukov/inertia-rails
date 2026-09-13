@@ -4,7 +4,7 @@ module InertiaRails
   # The core knobs plus the Rails-only ones; a callable value is evaluated inside
   # the bound controller.
   class Configuration < Inertia::Core::Configuration
-    DEFAULT_SSR_URL = 'http://localhost:13714'
+    DEFAULT_SSR_URL = Inertia::Core::SSR::Client::DEFAULT_URL
     XSRF_COOKIE_REFRESH_OPTIONS = XSRF_COOKIE_REFRESH_POLICIES
 
     # Overrides Rails default rendering behavior to render using Inertia by default.

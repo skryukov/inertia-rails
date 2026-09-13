@@ -85,7 +85,8 @@ module Inertia
           REWRITABLE.include?(status) && NON_GET_METHODS.include?(method) ? 303 : status
         end
 
-        # Whether `location` leaves the origin the request came in on.
+        # Whether `location` leaves the origin the request came in on. `host`
+        # is compared without brackets, the way `URI#hostname` answers.
         def external?(location, scheme:, host:, port:)
           return false if location.nil? || location.empty?
 
@@ -94,7 +95,7 @@ module Inertia
 
           target_scheme = uri.scheme || scheme
           target_port = uri.port || (target_scheme == 'https' ? 443 : 80)
-          target_scheme != scheme || !uri.host.casecmp?(host) || target_port != port
+          target_scheme != scheme || !uri.hostname.casecmp?(host) || target_port != port
         rescue URI::InvalidURIError
           false
         end

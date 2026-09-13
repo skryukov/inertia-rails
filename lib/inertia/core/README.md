@@ -1,9 +1,9 @@
 # Inertia::Core
 
 The framework-agnostic half of the [Inertia.js](https://inertiajs.com) server
-protocol: the page object, the configuration knobs, and the request/response
-decisions every adapter makes the same way. Plain Ruby, stdlib only (`json`,
-`uri`). `inertia_rails` is one adapter built on it; another framework's adapter
+protocol: the page object, the configuration knobs, the Rack middleware, the
+SSR client, and the request/response decisions every adapter makes the same
+way. Plain Ruby, stdlib only (`json`, `uri`, `net/http`, `digest`). `inertia_rails` is one adapter built on it; another framework's adapter
 is a `Host`, a `Configuration`, and a render helper.
 
 ```ruby
@@ -75,7 +75,37 @@ envelope or the metadata raises `ResolutionError`.
 
 ## The HTTP conventions
 
-The pure decisions live under `Inertia::Core::Protocol`:
+`Inertia::Core::Rack::Middleware` does the response side for any Rack app:
+
+```ruby
+use Inertia::Core::Rack::Middleware, configuration: config
+```
+
+- copies `X-XSRF-TOKEN` to `X-CSRF-Token` before the app runs;
+- a `301/302/303` to another origin becomes `409` + `X-Inertia-Location`
+  (when `convert_external_redirects`), other headers intact;
+- a `301/302` after `PUT/PATCH/DELETE` becomes `303`;
+- a GET whose `X-Inertia-Version` differs from `configuration.version`
+  becomes `409` + `X-Inertia-Location: <full URL>` + `X-Inertia-Version`.
+
+Mount it inside the session middleware: a location response keeps the app's
+headers, `Set-Cookie` included.
+
+Every protected hook is handed the same `Request`, which carries the `env`
+and reads the origin the client reached off the proxy headers (`Forwarded:
+proto=`, `X-Forwarded-Proto` from the front, `X-Forwarded-Ssl`, `HTTPS=on`,
+`X-Forwarded-Host`, `X-Forwarded-Port`, an IPv6 authority):
+
+| Hook | For |
+| --- | --- |
+| `request_for(env)` | Your framework's own request: subclass `Rack::Request` and override what it knows better (`fullpath` before a routing rewrite, say) |
+| `configuration_for(request)` | The configuration this route or controller carries; `nil` leaves the request alone |
+| `inertia_request?(request)` | Endpoints that opt out of Inertia handling |
+| `call_app(env)` | Wrapping the app call |
+| `after_app(request, status, stale:)` | Consuming per-visit session state, unless the visit goes on |
+| `refresh_response(request, configuration, headers, body)` | What a stale client is sent, e.g. keeping the flash |
+
+The pure decisions are also available on their own under `Inertia::Core::Protocol`:
 
 - `HEADER`, `VERSION_HEADER`, `LOCATION_HEADER` — the header names;
 - `request?(headers)` — an Inertia request, by header presence;
@@ -90,6 +120,20 @@ The pure decisions live under `Inertia::Core::Protocol`:
 - `location_headers(url, version:)` and `location_response(url, version:)` —
   the `409` + `X-Inertia-Location` (+ `X-Inertia-Version`) that tells the
   client to make a full page visit.
+
+## SSR
+
+`Inertia::Core::SSR::Client` renders a page through the SSR server on a first
+load, falling back to the client when the server is off, the bundle is
+missing (`ssr_bundle`), or the render failed (`on_ssr_error`,
+`ssr_raise_on_error`). It renders through `Host#dev_server_url` when one is
+up (uncached), caches through `Host#cache_store` under `ssr_cache`, and
+reports a failure through `Host#report_error(error, ssr: true, component:)`:
+
+```ruby
+Inertia::Core::SSR::Client.new(config, page: page, host: host).render
+# => { 'head' => [...], 'body' => '...' } or nil
+```
 
 ## Errors
 
