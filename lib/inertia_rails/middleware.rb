@@ -54,7 +54,7 @@ module InertiaRails
     private
 
     def prevent_precognition_writes?(env)
-      env['HTTP_PRECOGNITION'] == 'true' &&
+      Inertia::Core::Precognition.request?(env) &&
         InertiaRails.configuration.precognition_prevent_writes &&
         defined?(ActiveRecord::Base)
     end

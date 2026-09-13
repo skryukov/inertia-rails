@@ -22,7 +22,7 @@ module InertiaRails
         next unless request.format.html? || request.xhr?
         next if XsrfCookieRefreshPolicy.skip?(self)
 
-        cookies['XSRF-TOKEN'] = form_authenticity_token
+        cookies[Inertia::Core::XsrfCookie::COOKIE] = form_authenticity_token
       end
 
       rescue_from InertiaRails::PrecognitionResponse do |e|
@@ -110,13 +110,13 @@ module InertiaRails
     end
 
     def render_precognition(errors)
-      response.headers['Precognition'] = 'true'
+      precognition = Inertia::Core::Precognition
+      response.headers.merge!(precognition.headers(errors))
 
-      if errors.empty?
-        response.headers['Precognition-Success'] = 'true'
-        head :no_content
+      if (body = precognition.body(errors))
+        render json: body, status: precognition.status(errors)
       else
-        render json: { errors: errors }, status: :unprocessable_entity
+        head precognition.status(errors)
       end
     end
 

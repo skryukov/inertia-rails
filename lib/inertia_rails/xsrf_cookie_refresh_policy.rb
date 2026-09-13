@@ -1,7 +1,8 @@
 # frozen_string_literal: true
 
 module InertiaRails
-  # Decides whether the XSRF-TOKEN cookie rewrite can be skipped under the `:lazy` refresh policy.
+  # Whether the XSRF-TOKEN cookie rewrite can be skipped under the `:lazy`
+  # refresh policy: the core decides, Rails vouches for the cookie.
   class XsrfCookieRefreshPolicy
     def self.skip?(controller)
       new(controller).skip?
@@ -13,21 +14,20 @@ module InertiaRails
     end
 
     def skip?
-      return false unless configuration.xsrf_cookie_refresh == :lazy
-      return false unless @request.get? || @request.head?
+      policy = @controller.send(:inertia_configuration).xsrf_cookie_refresh
+      cookie = @request.cookies[Inertia::Core::XsrfCookie::COOKIE]
 
-      cookie = @request.cookies['XSRF-TOKEN']
-      return false if cookie.blank?
-
-      return true unless can_validate_without_loading_session?
-
-      valid_for_session?(cookie)
+      !Inertia::Core::XsrfCookie.refresh?(policy, @request.request_method, cookie) { |token| vouched?(token) }
     end
 
     private
 
-    def configuration
-      @controller.send(:inertia_configuration)
+    # Validating loads the session, so a request that never touched it keeps
+    # its cookie unchecked.
+    def vouched?(cookie)
+      return true unless can_validate_without_loading_session?
+
+      valid_for_session?(cookie)
     end
 
     def can_validate_without_loading_session?

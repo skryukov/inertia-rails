@@ -5,7 +5,7 @@ module InertiaRails
   # the bound controller.
   class Configuration < Inertia::Core::Configuration
     DEFAULT_SSR_URL = Inertia::Core::SSR::Client::DEFAULT_URL
-    XSRF_COOKIE_REFRESH_OPTIONS = XSRF_COOKIE_REFRESH_POLICIES
+    XSRF_COOKIE_REFRESH_OPTIONS = Inertia::Core::XsrfCookie::REFRESH_POLICIES
 
     # Overrides Rails default rendering behavior to render using Inertia by default.
     option :default_render, false

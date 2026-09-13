@@ -35,6 +35,7 @@ require_relative 'inertia_rails/renderer'
 # rails integration
 require_relative 'inertia_rails/flash_extension'
 require_relative 'inertia_rails/helper'
+require_relative 'inertia_rails/precognition_response'
 require_relative 'inertia_rails/precognition'
 require_relative 'inertia_rails/xsrf_cookie_refresh_policy'
 require_relative 'inertia_rails/controller'

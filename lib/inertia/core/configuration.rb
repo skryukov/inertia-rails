@@ -9,7 +9,6 @@ module Inertia
       ENV_PREFIX = 'INERTIA_'
       TRUTHY_ENV = %w[true 1 yes on].freeze
       FALSEY_ENV = %w[false 0 no off].freeze
-      XSRF_COOKIE_REFRESH_POLICIES = %i[always lazy].freeze
 
       class << self
         def options
@@ -197,10 +196,10 @@ module Inertia
       def xsrf_cookie_refresh
         value = super
         value = value.to_sym if value.respond_to?(:to_sym)
-        return value if XSRF_COOKIE_REFRESH_POLICIES.include?(value)
+        return value if XsrfCookie::REFRESH_POLICIES.include?(value)
 
         raise ArgumentError, "Invalid xsrf_cookie_refresh: #{value.inspect}. " \
-                             "Expected one of: #{XSRF_COOKIE_REFRESH_POLICIES.map(&:inspect).join(', ')}"
+                             "Expected one of: #{XsrfCookie::REFRESH_POLICIES.map(&:inspect).join(', ')}"
       end
 
       private

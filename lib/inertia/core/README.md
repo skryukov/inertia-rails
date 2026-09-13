@@ -165,6 +165,11 @@ proto=`, `X-Forwarded-Proto` from the front, `X-Forwarded-Ssl`, `HTTPS=on`,
 | `after_app(request, status, stale:)` | Consuming per-visit session state, unless the visit goes on |
 | `refresh_response(request, configuration, headers, body)` | What a stale client is sent, e.g. keeping the flash |
 
+The cookie half of the XSRF handshake is the host's: set
+`XsrfCookie::COOKIE` on protected responses, and ask
+`XsrfCookie.refresh?(policy, request_method, cookie) { |cookie| still_valid? }`
+whether the `:lazy` policy lets a safe request keep the cookie it carried.
+
 The pure decisions are also available on their own under `Inertia::Core::Protocol`:
 
 - `HEADER`, `VERSION_HEADER`, `LOCATION_HEADER` — the header names;
@@ -202,11 +207,27 @@ payload = Inertia::Core::Broadcast.props({ messages: -> { room.messages } }, eva
 # => { '__inertia' => { 'props' => { 'messages' => [...] } } }  — embed in the broadcast event
 ```
 
+## Precognition
+
+```ruby
+errors = Inertia::Core::Precognition.validate(env, form)   # nil unless the request is precognitive
+halt Precognition.status(errors), Precognition.headers(errors), JSON.generate(Precognition.body(errors) || {})
+```
+
+`validate` normalizes a Hash, an object answering `valid?` and `errors`, or
+one answering `to_hash` / `to_h`, filters by `Precognition-Validate-Only`,
+and raises `DoublePrecognitionError` on a second call in one request.
+`status` is 204 or 422, `headers` echoes `Precognition` and adds
+`Precognition-Success` on a pass, `body` is `{ errors: }` or nil.
+`request?(env)` and `validate_only(env)` read the request headers alone.
+
 ## Errors
 
 `Inertia::Core::Error` is the base. `Inertia::Core::ResolutionError` means the
 props or the page are mis-written. `Inertia::Core::SSRError` is an SSR failure
 (`type`, `hint`, `stack`, `source_location` when the server sent them).
+`Inertia::Core::DoublePrecognitionError` is a second `Precognition.validate`
+in one request.
 
 ## Stability
 

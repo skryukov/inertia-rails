@@ -2,6 +2,6 @@
 
 module InertiaRails
   class Current < ActiveSupport::CurrentAttributes
-    attribute :request, :precognition_called
+    attribute :request
   end
 end

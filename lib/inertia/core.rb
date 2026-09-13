@@ -5,7 +5,9 @@ require 'json'
 require_relative 'core/version'
 require_relative 'core/errors'
 require_relative 'core/resolution_error'
+require_relative 'core/double_precognition_error'
 require_relative 'core/host'
+require_relative 'core/xsrf_cookie'
 require_relative 'core/configuration'
 require_relative 'core/protocol'
 require_relative 'core/page'
@@ -46,6 +48,7 @@ require_relative 'core/ssr/client'
 require_relative 'core/rack'
 require_relative 'core/rack/request'
 require_relative 'core/rack/middleware'
+require_relative 'core/precognition'
 
 module Inertia
   # The framework-agnostic half of the Inertia protocol: prop types, their

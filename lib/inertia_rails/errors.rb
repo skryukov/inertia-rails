@@ -4,10 +4,5 @@ module InertiaRails
   Error = Inertia::Core::Error
   ResolutionError = Inertia::Core::ResolutionError
   SSRError = Inertia::Core::SSRError
-
-  class DoublePrecognitionError < StandardError
-    def initialize
-      super('You can only call precognition once per action, use a form object to validate multiple models.')
-    end
-  end
+  DoublePrecognitionError = Inertia::Core::DoublePrecognitionError
 end

@@ -8,10 +8,6 @@ module Inertia
       # Set-Cookie included. An adapter subclasses to hook its own request,
       # configuration and session conventions in.
       class Middleware
-        # The XSRF cookie comes back as a header the app reads under the CSRF name.
-        XSRF_HEADER_ENV_KEY = 'HTTP_X_XSRF_TOKEN'
-        CSRF_HEADER_ENV_KEY = 'HTTP_X_CSRF_TOKEN'
-
         def initialize(app, configuration: nil)
           @app = app
           @configuration = configuration
@@ -76,8 +72,8 @@ module Inertia
         private
 
         def copy_xsrf_to_csrf!(env)
-          token = env[XSRF_HEADER_ENV_KEY]
-          env[CSRF_HEADER_ENV_KEY] = token if token
+          token = env[XsrfCookie::HEADER_ENV_KEY]
+          env[XsrfCookie::CSRF_HEADER_ENV_KEY] = token if token
         end
 
         # XHR follows redirects transparently, so a cross-origin target is
