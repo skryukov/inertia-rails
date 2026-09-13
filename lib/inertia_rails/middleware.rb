@@ -59,16 +59,20 @@ module InertiaRails
           external_origin?(headers['Location'])
       end
 
+      # Compared against the origin the proxy forwarded, not the connection the
+      # app accepted: the app builds its redirect URLs from those headers too,
+      # so reading the raw socket would call every redirect behind a proxy
+      # external.
       def external_origin?(location)
         return false if location.blank?
 
         uri = URI.parse(location)
         return false if uri.host.blank?
 
-        scheme = uri.scheme || request.scheme
+        scheme = uri.scheme || origin.scheme
         port = uri.port || (scheme == 'https' ? 443 : 80)
 
-        scheme != request.scheme || !uri.host.casecmp?(request.host) || port != request.port
+        scheme != origin.scheme || !uri.hostname.casecmp?(origin.host) || port != origin.port
       rescue URI::InvalidURIError
         false
       end
@@ -120,6 +124,10 @@ module InertiaRails
         @request ||= ActionDispatch::Request.new(@env)
       end
 
+      def origin
+        @origin ||= RequestOrigin.new(request)
+      end
+
       def controller
         @env['action_controller.instance']
       end
@@ -157,7 +165,7 @@ module InertiaRails
 
       def force_refresh
         request.flash.keep
-        Rack::Response.new('', 409, { 'X-Inertia-Location' => request.original_url }).finish
+        Rack::Response.new('', 409, { 'X-Inertia-Location' => origin.url }).finish
       end
 
       def copy_xsrf_to_csrf!

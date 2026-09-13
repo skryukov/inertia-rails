@@ -45,6 +45,7 @@ require_relative 'inertia_rails/helper'
 require_relative 'inertia_rails/precognition'
 require_relative 'inertia_rails/xsrf_cookie_refresh_policy'
 require_relative 'inertia_rails/controller'
+require_relative 'inertia_rails/request_origin'
 require_relative 'inertia_rails/middleware'
 require_relative 'inertia_rails/engine'
 

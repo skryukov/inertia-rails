@@ -219,7 +219,7 @@ end
 ```
 
 > [!NOTE]
-> The origin comparison relies on the request scheme as Rails sees it (`X-Forwarded-Proto` is honored, as it is everywhere in Rails). If your app is behind a proxy, make sure it forwards this header — otherwise every absolute `https://` redirect to your own host will look cross-origin and trigger a full page visit.
+> The origin comparison follows the headers a proxy forwards — `X-Forwarded-Proto` (the first entry, the one the client faced), `X-Forwarded-Host`, and `X-Forwarded-Port` — because that is the origin your app builds its absolute URLs from. If your app is behind a proxy, make sure it forwards them; otherwise an absolute `https://` redirect to your own host looks cross-origin and triggers a full page visit.
 
 ### `flash_keys`
 
