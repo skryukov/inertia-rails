@@ -4,10 +4,6 @@ module Inertia
   module Core
     class Error < StandardError; end
 
-    # A mistake in the props or the page themselves, as opposed to a failure
-    # while producing a value.
-    class ResolutionError < Error; end
-
     # The SSR server failed to render, or could not be reached.
     class SSRError < Error
       attr_reader :type, :hint, :browser_api, :stack, :source_location
