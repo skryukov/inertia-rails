@@ -67,6 +67,13 @@ RSpec.describe Inertia::Core::Response do
     expect(host.events).to include([:resolve_props, { component: 'Dashboard', partial: true }])
   end
 
+  it 'never reads an absent partial header as a partial reload of a render without a component name' do
+    inertia = response({ name: 'Ada', count: 1 }, component: nil, env: env('X-Inertia-Partial-Data' => 'name'))
+
+    expect(inertia.partial?).to be false
+    expect(inertia.page[:props]).to eq(name: 'Ada', count: 1)
+  end
+
   it 'always ships the errors prop, on a partial reload too' do
     inertia = response({ errors: { name: 'taken' }, name: 'Ada' },
                        env: env('X-Inertia-Partial-Component' => 'Dashboard', 'X-Inertia-Partial-Data' => 'name'))

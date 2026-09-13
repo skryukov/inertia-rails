@@ -24,10 +24,11 @@ module Inertia
       end
 
       class << self
-        # A partial reload only applies to the component it was asked of.
+        # A partial reload only applies to the component it was asked of; a
+        # render without a component name is never one.
         def from_headers(headers, component:)
           new(
-            partial: headers[PARTIAL_COMPONENT] == component,
+            partial: !component.nil? && headers[PARTIAL_COMPONENT] == component,
             only: list(headers[ONLY]),
             except: list(headers[EXCEPT]),
             reset: list(headers[RESET]),
