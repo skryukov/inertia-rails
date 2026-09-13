@@ -137,15 +137,22 @@ module InertiaRails
       end
     end
 
+    # Every element keeps its slot. Partial reloads address array elements by
+    # index, so dropping one would shift every later element onto a path the
+    # page does not hold. An element the visit left out arrives as a
+    # placeholder instead: `{}` for an element written as a Hash, `nil` for
+    # anything else, which is also never evaluated.
     def transform_array(array, path, parent_was_resolved:)
-      return array unless needs_transform?(array)
+      return array unless needs_transform?(array) || (!parent_was_resolved && partial_request_reaches_below?(path))
 
-      array.each_with_index.filter_map do |item, i|
-        if item.is_a?(Hash)
-          nested = deep_transform_props(item, "#{path}.#{i}", parent_was_resolved: parent_was_resolved)
-          nested unless nested.empty?
+      array.each_with_index.map do |item, index|
+        item_path = "#{path}.#{index}"
+
+        case item
+        when Hash then deep_transform_props(item, item_path, parent_was_resolved: parent_was_resolved)
+        when Array then transform_array(item, item_path, parent_was_resolved: parent_was_resolved)
         else
-          @evaluator.call(item)
+          @evaluator.call(item) unless !parent_was_resolved && excluded_by_partial_request?(item_path)
         end
       end
     end
@@ -249,8 +256,24 @@ module InertiaRails
       partial_keys.any? { |key| key == path || key.start_with?(path_prefix) || path.start_with?("#{key}.") }
     end
 
+    def filtering_partial_request?
+      rendering_partial_component? && (partial_keys.present? || partial_except_keys.present?)
+    end
+
+    # Skipping resolution for a value with nothing to resolve is an
+    # optimisation, and it must not decide which keys a partial returns. An
+    # array is still walked when the visit names something below it — and only
+    # then, since no element can be excluded otherwise.
+    def partial_request_reaches_below?(path)
+      return false unless filtering_partial_request?
+
+      path_prefix = "#{path}."
+      partial_keys.any? { |key| key.start_with?(path_prefix) } ||
+        partial_except_keys.any? { |key| key.start_with?(path_prefix) }
+    end
+
     def excluded_by_partial_request?(path)
-      return false unless rendering_partial_component? && (partial_keys.present? || partial_except_keys.present?)
+      return false unless filtering_partial_request?
 
       excluded_by_only_partial_keys?(path) || excluded_by_except_partial_keys?(path)
     end

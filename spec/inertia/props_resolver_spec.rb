@@ -308,9 +308,12 @@ RSpec.describe InertiaRails::PropsResolver do
         'foos.0.bar'
       )
 
-      expect(page[:props][:foos].length).to eq(1)
+      expect(page[:props][:foos].length).to eq(2)
       expect(page[:props][:foos][0][:bar]).to eq('expensive-1')
       expect(page[:props][:foos][0]).not_to have_key(:name)
+      # The unrequested element keeps its slot: metadata paths are indexed, so
+      # dropping it would shift every later element onto the wrong path.
+      expect(page[:props][:foos][1]).to eq({})
     end
 
     it 'non-indexed field path does not match inside indexed array' do
@@ -323,7 +326,7 @@ RSpec.describe InertiaRails::PropsResolver do
         'foos.bar'
       )
 
-      expect(page[:props][:foos]).to eq([])
+      expect(page[:props][:foos]).to eq([{}])
     end
 
     it 'closure returning array with optional prop excludes it on initial load' do
@@ -391,6 +394,87 @@ RSpec.describe InertiaRails::PropsResolver do
 
       expect(page[:props][:foos][:items][0][:name]).to eq('First')
       expect(page[:props][:foos][:items][0][:bar]).to eq('expensive')
+    end
+  end
+
+  # A partial reload addresses array elements by index, so an element the visit
+  # left out has to stay at its index. It arrives as a placeholder instead:
+  # `{}` for an element written as a Hash, `nil` for anything else.
+  describe 'array slots' do
+    it 'keeps an unrequested hash element as an empty hash' do
+      page = resolve_partial(
+        { rows: [{ name: 'First' }, { name: 'Second' }] },
+        'rows.1.name'
+      )
+
+      expect(page[:props][:rows]).to eq([{}, { name: 'Second' }])
+    end
+
+    it 'does not evaluate a closure at an unrequested index and keeps its slot as nil' do
+      executed = false
+      page = resolve_partial(
+        { rows: [{ name: 'First' }, -> { executed = true }] },
+        'rows.0.name'
+      )
+
+      expect(executed).to be false
+      expect(page[:props][:rows]).to eq([{ name: 'First' }, nil])
+    end
+
+    it 'does not evaluate a closure at an except-ed index and keeps its slot as nil' do
+      executed = false
+      page = resolve(
+        { rows: [{ name: 'First' }, -> { executed = true }, { name: 'Third' }] },
+        visit: { component: true, only: ['rows'], except: ['rows.1'] }
+      )
+
+      expect(executed).to be false
+      expect(page[:props][:rows]).to eq([{ name: 'First' }, nil, { name: 'Third' }])
+    end
+
+    it 'evaluates a closure at a requested index' do
+      page = resolve_partial({ rows: ['zero', -> { 'one' }] }, 'rows.1')
+
+      expect(page[:props][:rows]).to eq([nil, 'one'])
+    end
+
+    it 'keeps an unrequested scalar element as a nil slot' do
+      page = resolve_partial({ rows: [{ name: 'First' }, 'plain'] }, 'rows.0.name')
+
+      expect(page[:props][:rows]).to eq([{ name: 'First' }, nil])
+    end
+
+    # Resolution is skipped for a value with nothing to resolve. That shortcut
+    # is an optimisation, and it must not decide which keys a partial returns.
+    it 'applies an indexed except path to an array of plain hashes' do
+      props = { rows: [{ name: 'n', secret: 's' }] }
+
+      page = resolve(props, visit: { component: true, except: ['rows.0.secret'] })
+
+      expect(page[:props][:rows]).to eq([{ name: 'n' }])
+    end
+
+    it 'applies an indexed only path to an array of plain hashes' do
+      props = { rows: [{ name: 'n', secret: 's' }] }
+
+      page = resolve(props, visit: { component: true, only: ['rows.0.name'] })
+
+      expect(page[:props][:rows]).to eq([{ name: 'n' }])
+    end
+
+    it 'keeps filtering below a second array level' do
+      props = { rows: [[{ name: 'n', secret: 's' }]] }
+
+      expect(resolve(props, visit: { component: true, except: ['rows.0.0.secret'] })[:props][:rows])
+        .to eq([[{ name: 'n' }]])
+      expect(resolve(props, visit: { component: true, only: ['rows.0.0.name'] })[:props][:rows])
+        .to eq([[{ name: 'n' }]])
+    end
+
+    it 'leaves an array alone on a full load' do
+      props = { rows: [{ name: 'n' }, 'plain', nil] }
+
+      expect(resolve(props)[:props][:rows]).to eq([{ name: 'n' }, 'plain', nil])
     end
   end
 
