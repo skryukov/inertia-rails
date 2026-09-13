@@ -52,6 +52,7 @@ require_relative 'core/rack/request'
 require_relative 'core/rack/middleware'
 require_relative 'core/precognition'
 require_relative 'core/response'
+require_relative 'core/devtools'
 
 module Inertia
   # The framework-agnostic half of the Inertia protocol: prop types, their

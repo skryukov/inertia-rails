@@ -14,31 +14,26 @@ module Inertia
         end
 
         def call(env)
-          copy_xsrf_to_csrf!(env)
-          status, headers, body = call_app(env)
+          recorder = recorder_for(env)
+          status, headers, body = handle(env)
 
-          request = request_for(env)
-          configuration = configuration_for(request)
-          handled = configuration && inertia_request?(request)
-
-          if handled && external_redirect?(request, configuration, status, headers)
-            status, headers, body = location_response!(headers, body, url: delete_header(headers, 'Location'),
-                                                                      version: configuration.version)
-          end
-
-          stale = handled && stale?(request, configuration)
-          after_app(request, status, stale: stale)
-          return [status, headers, body] unless handled
-
-          return refresh_response(request, configuration, headers, body) if stale && !location?(headers)
-
-          [Protocol::Redirect.status_for(request.request_method, status), headers, body]
+          recorder ? recorder.finish(status, headers, body) : [status, headers, body]
+        rescue StandardError => e
+          recorder&.record_exception(e)
+          raise
         end
 
         protected
 
         def call_app(env)
           @app.call(env)
+        end
+
+        # A DevTools recorder for the request, or nil. It sees the response as
+        # the protocol leaves it — a 303 rewrite or a 409 location response
+        # included.
+        def recorder_for(_env)
+          nil
         end
 
         # Subclass `Rack::Request` when the framework knows the request better
@@ -70,6 +65,28 @@ module Inertia
         end
 
         private
+
+        def handle(env)
+          copy_xsrf_to_csrf!(env)
+          status, headers, body = call_app(env)
+
+          request = request_for(env)
+          configuration = configuration_for(request)
+          handled = configuration && inertia_request?(request)
+
+          if handled && external_redirect?(request, configuration, status, headers)
+            status, headers, body = location_response!(headers, body, url: delete_header(headers, 'Location'),
+                                                                      version: configuration.version)
+          end
+
+          stale = handled && stale?(request, configuration)
+          after_app(request, status, stale: stale)
+          return [status, headers, body] unless handled
+
+          return refresh_response(request, configuration, headers, body) if stale && !location?(headers)
+
+          [Protocol::Redirect.status_for(request.request_method, status), headers, body]
+        end
 
         def copy_xsrf_to_csrf!(env)
           token = env[XsrfCookie::HEADER_ENV_KEY]

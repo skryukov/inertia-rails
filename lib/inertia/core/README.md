@@ -236,6 +236,7 @@ proto=`, `X-Forwarded-Proto` from the front, `X-Forwarded-Ssl`, `HTTPS=on`,
 | `call_app(env)` | Wrapping the app call |
 | `after_app(request, status, stale:)` | Consuming per-visit session state, unless the visit goes on |
 | `refresh_response(request, configuration, headers, body)` | What a stale client is sent, e.g. keeping the flash |
+| `recorder_for(env)` | A DevTools recorder for the request; it sees the response as the protocol leaves it |
 
 The cookie half of the XSRF handshake is the host's: set
 `XsrfCookie::COOKIE` on protected responses, and ask
@@ -294,6 +295,58 @@ and raises `DoublePrecognitionError` on a second call in one request.
 `status` is 204 or 422, `headers` echoes `Precognition` and adds
 `Precognition-Success` on a pass, `body` is `{ errors: }` or nil.
 `request?(env)` and `validate_only(env)` read the request headers alone.
+## DevTools
+
+`Inertia::Core::Devtools` is the server half of the DevTools protocol: every
+request becomes an entry the browser extension reads back, with a row per
+prop the page carries. The recording, the entry format and the store are the
+protocol's (`DEVTOOLS_CONTRACT.md` checks them against inertia-laravel); an
+adapter subclasses for what only its framework has.
+
+```ruby
+class MyRecorder < Inertia::Core::Devtools::Recorder
+  def nonce = MyApp::Request.new(env).csp_nonce           # the discovery tag's CSP nonce
+end
+
+class MyMiddleware < Inertia::Core::Rack::Middleware
+  def recorder_for(env)
+    env[MyRecorder::ENV_KEY] = MyRecorder.new(env, repository: REPOSITORY, host: HOST, limits: { limit: 100 })
+  end
+end
+
+use Inertia::Core::Devtools::Middleware                # outermost: finishes the entry of a request that raised
+use MyMiddleware, configuration: config
+
+recorder = env[MyRecorder::ENV_KEY]                    # inside the render:
+recorder&.render_started(component: component, shared_keys: [])
+Inertia::Core::Response.new(component, props, env: env, ..., observer: recorder&.collector || Inertia::Core::Observer::NULL)
+recorder&.page_rendered(inertia.page, inertia.metadata)
+```
+
+An adapter writes:
+
+| Piece | Duty |
+| --- | --- |
+| A read endpoint | `GET /_inertia/devtools/entries` (`repository.all`, filtered by `component`/`type`/`exclude`/`limit`/`offset`) and `/entries/:id` (`repository.get`), gated outside development |
+| A `Recorder` subclass | The hooks: `exchange(status, headers, body)` (an `Exchange` subclass), `nonce`, `buffered_body(body)` (nil for a stream), `refine_source(source, key)` (a share site narrowed to the key's line) |
+| An `Exchange` subclass | What the framework knows and the env does not: `request_method` behind a form override, `url`, `request_parameters` (uploads summarized), `raw_request_body`, `response_content` (nil when the body is a stream), `route`. The defaults answer from the Rack env alone |
+| A `Sources` subclass | The editor links: `component_path(component)` and `prop_line(file, line, key)`. The default links nothing |
+| The wiring | `recorder_for(env)` on the Rack middleware, `Devtools::Middleware` outermost, and its own configuration knobs (storage path, TTL, limits) |
+
+Everything else comes with the core: `Recorder` (the id and parent stamped on
+every response, the discovery tag inserted into an HTML page load — never
+into one carrying an `ETag` or `Last-Modified`, which `Rack::ETag` would not
+recompute — and the entry persisted when the body closes), `Headers` (the
+`X-Inertia-Devtools-*` names and the env keys they arrive under),
+`RequestType.of` (initial, navigate, partial, deferred, poll, prefetch,
+precognition, http), `Collector` (an `Observer` that assembles the page half
+of the entry from the ledger: a row per delivered prop with its `shared`,
+`reset` and `rescued` verdicts, and the value each row points at),
+`EntryBuilder` (the entry shape, body limits and omission reasons), `Ulid`
+(time-ordered ids, so newest-first is a string sort), `ScriptTag`, and
+`EntriesRepository` (a file-backed store shared across processes, pruned by
+TTL and capped per tab; subclass `report` to route a write failure into your
+own reporting).
 
 ## Errors
 
