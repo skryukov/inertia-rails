@@ -5,6 +5,7 @@ require 'json'
 
 # the framework-agnostic core
 require_relative 'inertia/core'
+require_relative 'inertia_rails/core_aliases'
 
 # modules
 require_relative 'inertia_rails/version'
@@ -13,24 +14,15 @@ require_relative 'inertia_rails/core_host'
 require_relative 'inertia_rails/current'
 require_relative 'inertia_rails/errors'
 
-# props
-require_relative 'inertia_rails/raw_json'
-require_relative 'inertia_rails/prop_cacheable'
-require_relative 'inertia_rails/prop_onceable'
-require_relative 'inertia_rails/prop_mergeable'
-require_relative 'inertia_rails/base_prop'
-require_relative 'inertia_rails/ignore_on_first_load_prop'
-require_relative 'inertia_rails/always_prop'
+# rails-side props
 require_relative 'inertia_rails/lazy_prop'
-require_relative 'inertia_rails/optional_prop'
-require_relative 'inertia_rails/cached_prop'
-require_relative 'inertia_rails/defer_prop'
-require_relative 'inertia_rails/merge_prop'
-require_relative 'inertia_rails/once_prop'
-require_relative 'inertia_rails/scroll_metadata'
-require_relative 'inertia_rails/scroll_prop'
-require_relative 'inertia_rails/prop_evaluator'
-require_relative 'inertia_rails/props_resolver'
+
+# pagination adapters for scroll props: they belong to the gems that define
+# the pagination objects, so the core ships none of them
+require_relative 'inertia_rails/scroll_adapters/kaminari_adapter'
+require_relative 'inertia_rails/scroll_adapters/pagy_adapter'
+Inertia::Core::ScrollMetadata.register_adapter(InertiaRails::ScrollAdapters::PagyAdapter)
+Inertia::Core::ScrollMetadata.register_adapter(InertiaRails::ScrollAdapters::KaminariAdapter)
 
 # ssr
 require_relative 'inertia_rails/ssr'
@@ -65,7 +57,8 @@ module InertiaRails
       @host ||= CoreHost.new
     end
 
-    # The store a configuration names, `Rails.cache` by default.
+    # The store a configuration names, `Rails.cache` by default. A render
+    # passes its own, so `inertia_config(cache_store:)` reaches cached props.
     def cache_store(configuration = self.configuration)
       configuration.cache_store
     end
@@ -82,8 +75,8 @@ module InertiaRails
       OptionalProp.new(...)
     end
 
-    def always(&block)
-      AlwaysProp.new(&block)
+    def always(...)
+      AlwaysProp.new(...)
     end
 
     def once(...)

@@ -2,6 +2,7 @@
 
 module InertiaRails
   Error = Inertia::Core::Error
+  ResolutionError = Inertia::Core::ResolutionError
   SSRError = Inertia::Core::SSRError
 
   class DoublePrecognitionError < StandardError

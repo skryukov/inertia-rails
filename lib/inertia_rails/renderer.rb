@@ -20,6 +20,7 @@ module InertiaRails
 
       @controller = controller
       @configuration = controller.__send__(:inertia_configuration)
+      @host = CoreHost.new(@configuration)
       @request = request
       @response = response
       @render_method = render_method
@@ -35,7 +36,7 @@ module InertiaRails
                                    component.is_a?(Hash) ? component : @controller.__send__(:inertia_view_assigns))
       shared = shared_data
       @shared_keys = @configuration.expose_shared_prop_keys ? extract_shared_keys(shared) : nil
-      @props = merge_props(shared, passed_props, deep_merge)
+      @props = Inertia::Core::PropsMerger.merge(shared, passed_props, deep: deep_merge)
 
       @component = resolve_component(component)
 
@@ -77,7 +78,7 @@ module InertiaRails
     private
 
     def ssr_render
-      Inertia::Core::SSR::Client.new(@configuration, page: page, host: InertiaRails.host, cache: @ssr_cache).render
+      Inertia::Core::SSR::Client.new(@configuration, page: page, host: @host, cache: @ssr_cache).render
     end
 
     def layout
@@ -87,19 +88,6 @@ module InertiaRails
 
     def shared_data
       @controller.__send__(:inertia_shared_data)
-    end
-
-    # Cast props to symbol keyed hash before merging so that we have a consistent data structure and
-    # avoid duplicate keys after merging.
-    #
-    # Functionally, this permits using either string or symbol keys in the controller. Since the results
-    # is cast to json, we should treat string/symbol keys as identical.
-    def merge_props(shared_props, props, deep_merge)
-      if deep_merge
-        shared_props.deep_symbolize_keys.deep_merge!(props.deep_symbolize_keys)
-      else
-        shared_props.symbolize_keys.merge(props.symbolize_keys)
-      end
     end
 
     def extract_shared_keys(shared_props)
@@ -116,24 +104,27 @@ module InertiaRails
     end
 
     def partial_reload?
-      @request.headers['X-Inertia-Partial-Component'] == @component
+      visit.partial?
+    end
+
+    def visit
+      @visit ||= Inertia::Core::Visit.from_headers(@request.headers, component: @component)
+    end
+
+    # The adapter's say over resolution: the testing helpers turn on `eager:` here.
+    def resolver_options
+      {}
     end
 
     def build_page
       wrap_errors_prop!(@props)
       validate_meta_prop!
 
-      resolver = PropsResolver.new(
+      resolver = Inertia::Core::PropsResolver.new(
         @props,
-        evaluator: PropEvaluator.new(@controller,
-                                     scroll_intent: @request.headers['X-Inertia-Infinite-Scroll-Merge-Intent']),
-        visit: {
-          component: partial_reload?,
-          only: parse_header('X-Inertia-Partial-Data'),
-          except: parse_header('X-Inertia-Partial-Except'),
-          reset: parse_header('X-Inertia-Reset'),
-          except_once: parse_header('X-Inertia-Except-Once-Props'),
-        }
+        evaluator: Inertia::Core::PropEvaluator.new(@controller, host: @host),
+        visit: visit,
+        **resolver_options
       )
       resolved_props, metadata = resolver.resolve
 
@@ -201,14 +192,10 @@ module InertiaRails
     end
 
     def wrap_errors_prop!(props)
-      return unless props.key?(:errors) && !props[:errors].is_a?(BaseProp)
+      return unless props.key?(:errors) && !props[:errors].is_a?(Inertia::Core::Prop)
 
       errors = props[:errors]
       props[:errors] = InertiaRails.always { errors }
-    end
-
-    def parse_header(name)
-      (@request.headers[name] || '').split(',').compact_blank!
     end
   end
 end

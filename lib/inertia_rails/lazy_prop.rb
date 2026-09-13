@@ -9,16 +9,7 @@ module InertiaRails
         '`lazy` is deprecated and will be removed in InertiaRails 4.0, use `optional` instead.'
       )
 
-      @value = value
-      super(&block)
-    end
-
-    def call(controller, **)
-      value.respond_to?(:call) ? controller.instance_exec(&value) : value
-    end
-
-    def value
-      @value.nil? ? @block : @value
+      block ? super(&block) : super(value: value)
     end
   end
 end

@@ -1,8 +1,8 @@
 # frozen_string_literal: true
 
 module InertiaRails
-  # Wires Inertia::Core to Rails. Built with a configuration, so a controller's
-  # `inertia_config(cache_store:)` can reach cached props and SSR alike.
+  # Wires Inertia::Core to Rails. Built per render, so a controller's
+  # `inertia_config(cache_store:)` reaches cached props and SSR alike.
   class CoreHost < Inertia::Core::Host
     def initialize(configuration = nil)
       super()
@@ -13,8 +13,10 @@ module InertiaRails
       InertiaRails.cache_store(@configuration || InertiaRails.configuration)
     end
 
+    # `v2` retires pre-`to_inertia` entries — they would replay a serializer's
+    # internals forever. `inertia_rails/v2/` would collide with an app's `v2/…`.
     def expand_cache_key(key)
-      "inertia_rails/#{ActiveSupport::Cache.expand_cache_key(key)}"
+      "inertia_rails_v2/#{ActiveSupport::Cache.expand_cache_key(key)}"
     end
 
     def instrument(event, payload = {}, &block)
