@@ -85,8 +85,6 @@ router.visit(url, {
 
 ### Filtering Inside Arrays
 
-@available_since rails=master
-
 Dot-notation keys address array elements by index: `rows.0.name` selects one key of one element. The response still replaces the whole array on the client, so this saves server work, not client state. Elements you did not ask for are never evaluated and arrive as placeholders: `{}` for an element written as a Hash, `null` for anything else — including a lambda or serializer that would have produced a Hash, since it never runs.
 
 ```ruby
@@ -102,7 +100,7 @@ router.reload({ only: ['rows.0.name'] })
 
 After this reload the page holds exactly `[{ name: 'First' }, {}]` — the second row's data is gone. Ask for every path the page still needs, or reload the whole prop. The placeholders exist to keep each element at its index, so the paths announced for deferred and merged props still match.
 
-Objects work the other way round: a nested object whose every key the reload filtered out is dropped along with its key, rather than arriving as `{}`.
+Objects work the other way round: a nested object whose every key the reload filtered out is dropped along with its key, rather than arriving as `{}`. The filter reaches inside whatever produced the object — a literal hash, a lambda, a serializer or a prop — the same way.
 
 ## Router Shorthand
 
@@ -212,7 +210,7 @@ end
 > [!NOTE]
 > Prior to Inertia.js v2, the method `InertiaRails.lazy` was used. It is now deprecated and has been replaced by `InertiaRails.optional`. Please update your code accordingly to ensure compatibility with the latest version.
 
-On the inverse, you can use the `InertiaRails.always` method to specify that a prop should always be included, even if it has not been explicitly required in a partial reload.
+On the inverse, you can use the `InertiaRails.always` method to specify that a prop should always be included, even if it has not been explicitly required in a partial reload. An `always` prop only overrides the exclusion of its own key: a reload that names keys inside it (`only: ['users.0.name']`, `except: ['users.0.email']`) still filters inside.
 
 ```ruby
 class UsersController < ApplicationController

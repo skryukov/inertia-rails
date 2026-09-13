@@ -1383,6 +1383,9 @@ class UsersController < ApplicationController
 end
 ```
 
+> [!NOTE]
+> The built-in adapters declare the override names they accept (`page_name`, `previous_page`, `next_page`, `current_page`), so a misspelled override raises instead of vanishing. A custom adapter stays open — it receives every unrecognized option untouched — unless it declares its own names with an `accepted_options` method returning an array of symbols.
+
 ### Wrapper Option
 
 The `wrapper` option allows you to specify a custom key for nested data structures. This is useful when your data is wrapped in an object with metadata:

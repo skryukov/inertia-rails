@@ -123,6 +123,10 @@ Please note that if you manually provide a props hash in your render call, the i
 >
 > This creates a high risk of accidentally leaking sensitive data or internal implementation details to the client. It can also negatively impact performance by serializing unnecessary heavy objects. We recommend being explicit with your props whenever possible.
 
+## Serializing Props
+
+Props are encoded as JSON before they reach the page. Rails' `as_json`, the `to_inertia` protocol, and serializer libraries like [`alba-inertia`](https://github.com/skryukov/alba-inertia) each give you a different level of control. See the [Serialization guide](/guide/serialization) for the full picture — including per-attribute prop types, shared props, and [key casing](/guide/serialization#key-casing).
+
 ## Root Template Data
 
 There are situations where you may want to access your prop data in your ERB template. For example, you may want to add a meta description tag, Twitter card meta tags, or Facebook Open Graph meta tags.

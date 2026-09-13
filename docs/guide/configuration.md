@@ -48,28 +48,10 @@ Use `component_path_resolver` to customize component path resolution when [`defa
 
 **Default**: `->(props:) { props }`
 
-Use `prop_transformer` to apply a transformation to your props before they're sent to the view. One use-case this enables is to work with `snake_case` props within Rails while working with `camelCase` in your view:
+`prop_transformer` receives the fully-resolved prop hash and returns a transformed hash before it's sent to the page. Transforming prop _values_ is safe; **renaming keys is not**. Inertia's [partial reload](/guide/partial-reloads) metadata (`deferredProps`, `mergeProps`, and so on) is keyed by the original prop names and is not remapped, so renamed keys desync from the metadata that points at them.
 
-```ruby
-  inertia_config(
-    prop_transformer: lambda do |props:|
-      props.deep_transform_keys { |key| key.to_s.camelize(:lower) }
-    end
-  )
-```
-
-> [!NOTE]
-> This controls the props provided by Inertia Rails but does not concern itself with props coming _into_ Rails. You may want to add a global `before_action` to `ApplicationController`:
-
-```ruby
-before_action :underscore_params
-
-# ...
-
-def underscore_params
-  params.deep_transform_keys! { |key| key.to_s.underscore }
-end
-```
+> [!WARNING]
+> Don't use `prop_transformer` to convert keys between `snake_case` and `camelCase`. It only ever sees the resolved props, so the metadata paths — and every value coming _into_ Rails from forms and partial reloads — stay in `snake_case`, and deferred props, merges, infinite scroll, and form submissions silently break. For full `snake_case` ↔ `camelCase` conversion, use [`inertia-caseshift`](https://github.com/skryukov/inertia-caseshift), which handles the entire round-trip on the client. See [Key Casing](/guide/serialization#key-casing).
 
 ### `cache_store`
 

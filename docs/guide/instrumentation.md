@@ -12,12 +12,15 @@ Events fire on every Inertia render. When no subscribers are attached, the overh
 | ----------------------------- | --------------------------------------------------- | ---------------------------- |
 | `render.inertia_rails`        | The entire Inertia render, including view rendering | `:component, :partial, :ssr` |
 | `resolve_props.inertia_rails` | Prop resolution, where your prop blocks execute     | `:component, :partial`       |
+| `cache_fetch.inertia_rails`   | One [cached prop](/guide/cached-props) read         | `:key, :hit`                 |
 | `ssr.inertia_rails`           | The HTTP call to the SSR server                     | `:url, :component`           |
 
 The payload keys:
 
 - `:component` — the resolved page component name, such as `"users/show"`.
 - `:partial` — `true` on [partial reloads](/guide/partial-reloads).
+- `:key` — the cache key of the cached prop, including the `inertia_rails_v2/` namespace.
+- `:hit` — `true` when the value came from the cache store, `false` when the prop block ran and the result was written.
 - `:ssr` — `true` when the response body came from [SSR](/guide/server-side-rendering). It stays `false` for JSON responses, when SSR is disabled, and when a failed SSR call falls back to client-side rendering.
 - `:url` — the SSR server endpoint the request was sent to.
 

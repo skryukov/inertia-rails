@@ -139,6 +139,7 @@ export default withMermaid({
         {
           text: 'Data & Props',
           items: [
+            { text: 'Serialization', link: '/guide/serialization' },
             { text: 'Shared data', link: '/guide/shared-data' },
             { text: 'Flash data', link: '/guide/flash-data' },
             { text: 'Partial reloads', link: '/guide/partial-reloads' },
