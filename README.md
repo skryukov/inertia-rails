@@ -143,6 +143,16 @@ bundle install
 bundle exec rspec
 ```
 
+The framework-agnostic half of the adapter is the
+[`inertia-core`](gems/inertia-core) gem, developed in this repository and
+released in lockstep. Its suite runs on plain Ruby, without Rails:
+
+```bash
+cd gems/inertia-core
+bundle install
+bundle exec rspec
+```
+
 See the [Code of Conduct](CODE_OF_CONDUCT.md). Everyone interacting with the
 project is expected to follow it.
 

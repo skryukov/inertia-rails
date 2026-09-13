@@ -26,3 +26,4 @@ gemfiles/*.gemfile.lock
 
 # Local files, such as .env.development.local
 *.local
+/gems/inertia-core/Gemfile.lock

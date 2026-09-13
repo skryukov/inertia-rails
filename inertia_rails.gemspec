@@ -28,5 +28,6 @@ Gem::Specification.new do |spec|
   spec.files = Dir['{app,lib}/**/*', 'CHANGELOG.md', 'LICENSE.txt', 'README.md']
   spec.require_paths = ['lib']
 
+  spec.add_dependency 'inertia-core', InertiaRails::VERSION
   spec.add_dependency 'railties', '>= 6'
 end

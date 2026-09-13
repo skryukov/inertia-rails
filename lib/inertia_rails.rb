@@ -3,8 +3,8 @@
 # stdlib
 require 'json'
 
-# the framework-agnostic core (gems/inertia-core)
-require_relative '../gems/inertia-core/lib/inertia/core'
+# the framework-agnostic core (the inertia-core gem)
+require 'inertia/core'
 require_relative 'inertia_rails/core_aliases'
 
 # modules

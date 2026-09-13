@@ -7,7 +7,7 @@
 #
 # This script:
 #   1. Validates the version and git state
-#   2. Bumps VERSION in lib/inertia_rails/version.rb and lib/inertia/core/version.rb
+#   2. Bumps VERSION in both gems (inertia_rails and inertia-core)
 #   3. Replaces `rails=master` with `rails=X.Y.Z` in docs @available_since markers
 #   4. Stamps today's date on the CHANGELOG header (or inserts a new one)
 #   5. Runs tests and the linter
@@ -16,7 +16,7 @@
 # With --dry-run: runs steps 1-5, shows the diff that would be committed, then
 # stops without creating a commit or tag. Files are left modified so you can
 # inspect them — reset with:
-#   git checkout -- lib/inertia_rails/version.rb lib/inertia/core/version.rb CHANGELOG.md docs
+#   git checkout -- lib/inertia_rails/version.rb gems/inertia-core CHANGELOG.md docs
 #
 # Pushing the tag triggers .github/workflows/push_gem.yml, which publishes to
 # rubygems.org via trusted publishing and creates a GitHub release.
@@ -82,10 +82,14 @@ if git rev-parse "$TAG" >/dev/null 2>&1; then
   error "Tag $TAG already exists"
 fi
 
-# -- 3. Bump VERSION constant -------------------------------------------------
+# -- 3. Bump VERSION constants ------------------------------------------------
+# Both gems in this repository release together, and inertia_rails depends on
+# the exact inertia-core version — so a bump that missed one would publish a
+# gem nobody can install.
 info "Bumping VERSION to $VERSION..."
 # `ruby -i -pe` keeps behavior identical on macOS and Linux (sed -i differs).
-ruby -i -pe "gsub(/VERSION = '[^']*'/, \"VERSION = '${VERSION}'\")" lib/inertia_rails/version.rb lib/inertia/core/version.rb
+ruby -i -pe "gsub(/VERSION = '[^']*'/, \"VERSION = '${VERSION}'\")" \
+  lib/inertia_rails/version.rb gems/inertia-core/lib/inertia/core/version.rb
 
 # -- 4. Update docs @available_since markers ---------------------------------
 info "Replacing rails=master in docs..."
@@ -136,12 +140,12 @@ if [[ "$DRY_RUN" == "true" ]]; then
   echo
   warn "No commit or tag was created."
   echo "To inspect the changes in detail: git diff"
-  echo "To reset the working tree:        git checkout -- lib/inertia_rails/version.rb lib/inertia/core/version.rb CHANGELOG.md docs"
+  echo "To reset the working tree:        git checkout -- lib/inertia_rails/version.rb gems/inertia-core CHANGELOG.md docs"
   exit 0
 fi
 
 info "Creating release commit and tag..."
-git add lib/inertia_rails/version.rb lib/inertia/core/version.rb CHANGELOG.md docs
+git add lib/inertia_rails/version.rb gems/inertia-core CHANGELOG.md docs
 git commit -m "Bump to $VERSION"
 git tag "$TAG"
 
