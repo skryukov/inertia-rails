@@ -3,7 +3,10 @@
 # The core suite runs on plain Ruby: no Rails, no ActiveSupport. Run it on its
 # own with `bundle exec rspec -O spec/core/.rspec spec/core`; under the root
 # `.rspec` (`bundle exec rspec spec/core`) it runs inside the Rails suite.
+# Anything a spec needs from a host is a tiny test double in spec/core/support.
 require_relative '../../lib/inertia/core'
+
+Dir[File.join(__dir__, 'support', '**', '*.rb')].each { |file| require file }
 
 RSpec.configure do |config|
   config.disable_monkey_patching!

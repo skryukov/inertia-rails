@@ -329,7 +329,9 @@ RSpec.describe 'rendering inertia views', type: :request do
       end
     end
 
-    context 'with only props that target transformed data' do
+    # A path is excluded by the visit or it is not, whatever produced the
+    # container at that path: `only`/`except` reach inside a closure's value.
+    context 'with only props that target data a closure produces' do
       let(:headers) do
         {
           'X-Inertia' => true,
@@ -340,20 +342,19 @@ RSpec.describe 'rendering inertia views', type: :request do
 
       before { get deeply_nested_props_path, headers: headers }
 
-      it 'resolves the closure and includes all children' do
+      it 'resolves the closure and keeps only the requested child' do
         expect(response.parsed_body['props']).to eq(
           'always' => 'always prop',
           'nested' => {
             'evaluated' => {
               'first' => 'first evaluated nested param',
-              'second' => 'second evaluated nested param',
             },
           }
         )
       end
     end
 
-    context 'with except props that target transformed data' do
+    context 'with except props that target data a closure produces' do
       let(:headers) do
         {
           'X-Inertia' => true,
@@ -364,7 +365,7 @@ RSpec.describe 'rendering inertia views', type: :request do
 
       before { get deeply_nested_props_path, headers: headers }
 
-      it 'renders the entire evaluated prop' do
+      it 'resolves the closure and drops the excluded child' do
         expect(response.parsed_body['props']).to eq(
           'always' => 'always prop',
           'flat' => 'flat param',
@@ -374,7 +375,6 @@ RSpec.describe 'rendering inertia views', type: :request do
             'first' => 'first nested param',
             'second' => 'second nested param',
             'evaluated' => {
-              'first' => 'first evaluated nested param',
               'second' => 'second evaluated nested param',
             },
             'deeply_nested' => {
@@ -475,11 +475,12 @@ RSpec.describe 'rendering inertia views', type: :request do
         }
       end
 
-      it 'works with dot notation only with simple props' do
+      # `nested_optional.first` is the only key the optional prop produces;
+      # excluding it empties the hash, and an emptied hash takes its key along.
+      it 'works with dot notation inside a prop-produced hash too' do
         expect(response.parsed_body['props']).to eq(
           'always' => 'always prop',
-          'nested' => { 'second' => 'second nested param' },
-          'nested_optional' => { 'first' => 'first nested optional param' }
+          'nested' => { 'second' => 'second nested param' }
         )
       end
     end
@@ -946,7 +947,7 @@ RSpec.describe 'rendering inertia views', type: :request do
       end
 
       it 'writes to cache store' do
-        expect(cache_store.read('inertia_rails/stats_key')).to eq({ count: 42 }.to_json)
+        expect(cache_store.read('inertia_rails_v2/stats_key')).to eq({ count: 42 }.to_json)
       end
 
       it 'returns RawJson on second request' do
@@ -970,7 +971,7 @@ RSpec.describe 'rendering inertia views', type: :request do
         end
 
         it 'does not write to cache on first load' do
-          expect(cache_store.read('inertia_rails/feed_key')).to be_nil
+          expect(cache_store.read('inertia_rails_v2/feed_key')).to be_nil
         end
       end
 
@@ -990,7 +991,7 @@ RSpec.describe 'rendering inertia views', type: :request do
         end
 
         it 'writes result to cache' do
-          expect(cache_store.read('inertia_rails/feed_key')).to eq(%w[fresh_item].to_json)
+          expect(cache_store.read('inertia_rails_v2/feed_key')).to eq(%w[fresh_item].to_json)
         end
       end
 
@@ -1004,7 +1005,7 @@ RSpec.describe 'rendering inertia views', type: :request do
         end
 
         before do
-          cache_store.write('inertia_rails/feed_key', '["cached_item"]')
+          cache_store.write('inertia_rails_v2/feed_key', '["cached_item"]')
           get cached_deferred_props_path, headers: headers
         end
 
@@ -1023,7 +1024,7 @@ RSpec.describe 'rendering inertia views', type: :request do
         end
 
         it 'does not write to cache on first load' do
-          expect(cache_store.read('inertia_rails/categories_key')).to be_nil
+          expect(cache_store.read('inertia_rails_v2/categories_key')).to be_nil
         end
       end
 
@@ -1043,7 +1044,7 @@ RSpec.describe 'rendering inertia views', type: :request do
         end
 
         it 'writes result to cache' do
-          expect(cache_store.read('inertia_rails/categories_key')).to eq(%w[category1 category2].to_json)
+          expect(cache_store.read('inertia_rails_v2/categories_key')).to eq(%w[category1 category2].to_json)
         end
       end
 
@@ -1057,7 +1058,7 @@ RSpec.describe 'rendering inertia views', type: :request do
         end
 
         before do
-          cache_store.write('inertia_rails/categories_key', '["cached_cat"]')
+          cache_store.write('inertia_rails_v2/categories_key', '["cached_cat"]')
           get optional_cached_props_path, headers: headers
         end
 

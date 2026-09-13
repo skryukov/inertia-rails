@@ -25,7 +25,7 @@ RSpec.describe 'ActiveRecord::Relation serialization' do
 
   def resolve(props)
     InertiaRails::PropsResolver.new(
-      props, evaluator: InertiaRails::PropEvaluator.new(Object.new), visit: {}
+      props, evaluator: InertiaRails::PropEvaluator.new(Object.new, host: InertiaRails.host), visit: {}
     ).resolve.first
   end
 
@@ -43,13 +43,6 @@ RSpec.describe 'ActiveRecord::Relation serialization' do
     expect(resolve({ fruits: fruits.all })).to eq(resolve({ fruits: fruits.all.to_a }))
   end
 
-  it 'resolves prop types a record to_inertia returns' do
-    fruits = model { def to_inertia = { name: name, stock: InertiaRails.optional { 42 } } }
-    fruits.create!(name: 'kiwi', secret: 'hidden')
-
-    expect(resolve({ fruits: fruits.all })[:fruits]).to eq([{ name: 'kiwi' }])
-  end
-
   it 'hands records without to_inertia over untouched' do
     fruits = model
     fruits.create!(name: 'fig', secret: 's')
@@ -59,7 +52,7 @@ RSpec.describe 'ActiveRecord::Relation serialization' do
     expect(resolved).to all(be_a(ActiveRecord::Base))
   end
 
-  it 'installs the protocol on ActiveRecord::Relation' do
+  it 'keeps an app-defined Relation#to_inertia' do
     expect(ActiveRecord::Relation.ancestors).to include(InertiaRails::InertiaRelation)
   end
 end

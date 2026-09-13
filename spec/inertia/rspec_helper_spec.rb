@@ -590,6 +590,16 @@ RSpec.describe InertiaRails::RSpec, type: :request do
         expect(inertia.props[:name]).to eq 'Brian'
         expect(inertia.props[:users]).to eq [{ 'id' => 1, 'name' => 'User 1' }, { 'id' => 2, 'name' => 'User 2' }]
       end
+
+      # A forced deferred scroll prop delivers its value, so the pagination
+      # metadata must come along — a value without scrollProps breaks the client.
+      it 'announces scrollProps for the deferred scroll prop it forces' do
+        page = { page_name: 'page', previous_page: nil, next_page: 2, current_page: 1 }
+        prop = InertiaRails.scroll(page, defer: true) { [1] }
+
+        expect(delivered?(prop, path: 'items', eager: true)).to be true
+        expect(announced(prop, path: 'items', eager: true)[:scrollProps]).to have_key('items')
+      end
     end
 
     context 'when disabled (default)' do
