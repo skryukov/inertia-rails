@@ -17,7 +17,14 @@ RSpec.describe Inertia::Core::Devtools::EntryBuilder do
     exchange = Inertia::Core::Devtools::Exchange.new(env, status: status, headers: headers, body: body)
 
     described_class.new(exchange, id: Inertia::Core::Devtools::Ulid.generate, elapsed_ms: 1.5, prefetch: prefetch,
-                                  collector: collector, error: error).build
+                                  collector: collector, redactor: redactor, error: error).build
+  end
+
+  let(:redactor) do
+    Inertia::Core::Devtools::Redactor.new(
+      filter: Inertia::Core::Devtools::KeyFilter.new(%w[password token]),
+      header_keys: %w[authorization cookie]
+    )
   end
 
   # A finished collector, without a resolution to run: what the entry merges
@@ -78,33 +85,36 @@ RSpec.describe Inertia::Core::Devtools::EntryBuilder do
     expect(Inertia::Core::Devtools::RequestType.prefetch?('HTTP_PURPOSE' => 'Prefetch')).to be true
   end
 
-  it 'records where a redirect points' do
-    location = build(env, status: 302, headers: { 'Location' => 'http://example.com/x?page=2' })
-    expect(location[:__meta][:redirectLocation]).to eq 'http://example.com/x?page=2'
-    expect(location[:http][:responseHeaders]['location']).to eq 'http://example.com/x?page=2'
+  it 'records where a redirect points, with the query redacted' do
+    location = build(env, status: 302, headers: { 'Location' => 'http://example.com/x?token=leaked' })
+    expect(location[:__meta][:redirectLocation]).to eq 'http://example.com/x?token=leaked'
+    expect(location[:http][:responseHeaders]['location']).to eq 'http://example.com/x?token=%5BREDACTED%5D'
 
     full_visit = build(env, status: 409, headers: { 'x-inertia-location' => 'http://example.com/x' })
     expect(full_visit[:__meta][:redirectLocation]).to eq 'http://example.com/x'
     expect(build(env)[:__meta][:redirectLocation]).to be_nil
   end
 
-  it 'records the headers under the names the client sent, flattened to strings' do
-    entry = build(env('HTTP_ACCEPT' => 'text/html', 'CONTENT_TYPE' => 'application/json', 'rack.input' => nil),
-                  headers: { 'Vary' => %w[X-Inertia Accept] })
+  it 'redacts the headers it was told to and leaves the rest' do
+    entry = build(env('HTTP_AUTHORIZATION' => 'Bearer x', 'HTTP_COOKIE' => 'a=b', 'HTTP_ACCEPT' => 'text/html',
+                      'CONTENT_TYPE' => 'application/json'))
 
-    expect(entry[:http][:requestHeaders]).to eq('accept' => 'text/html', 'content-type' => 'application/json',
-                                                'host' => 'example.com')
-    expect(entry[:http][:responseHeaders]).to eq('vary' => 'X-Inertia, Accept')
+    expect(entry[:http][:requestHeaders]).to include(
+      'authorization' => '[REDACTED]', 'cookie' => '[REDACTED]',
+      'accept' => 'text/html', 'content-type' => 'application/json'
+    )
   end
 
-  it 'keeps a JSON request body, and omits what it cannot read by key' do
+  it 'redacts a JSON request body by key, and omits what it cannot' do
     post = lambda do |content|
       build(env('REQUEST_METHOD' => 'POST', 'HTTP_X_INERTIA' => 'true',
                 'rack.input' => StringIO.new(content)))[:http][:requestBody]
     end
 
-    expect(post.call('{"name":"Brandon"}')).to eq(status: 'present', value: { 'name' => 'Brandon' })
-    expect(post.call('name=Brandon')).to eq(status: 'omitted', reason: 'unserializable')
+    expect(post.call('{"password":"hunter2","name":"Brandon"}')).to eq(
+      status: 'present', value: { 'password' => '[REDACTED]', 'name' => 'Brandon' }
+    )
+    expect(post.call('password=hunter2')).to eq(status: 'omitted', reason: 'unserializable')
     expect(post.call('"a string"')).to eq(status: 'omitted', reason: 'unserializable')
     expect(post.call('')).to eq(status: 'empty')
     expect(post.call("{\"a\":\"#{'x' * described_class::RAW_BODY_LIMIT}\"}"))
@@ -117,12 +127,14 @@ RSpec.describe Inertia::Core::Devtools::EntryBuilder do
     expect(entry[:http][:requestBody]).to eq(status: 'omitted', reason: 'non-inertia-request')
   end
 
-  it 'records a response body only when it is JSON, and omits the rest in the words the extension has' do
+  it 'records a response body only when it can be redacted by key, and omits the rest in the words the extension has' do
     response = lambda do |content_type, body|
       build(env, headers: { 'content-type' => content_type }, body: body)[:http][:responseBody]
     end
 
-    expect(response.call('application/json', ['{"ok":true}'])).to eq(status: 'present', value: { 'ok' => true })
+    expect(response.call('application/json', ['{"token":"leaked"}'])).to eq(
+      status: 'present', value: { 'token' => '[REDACTED]' }
+    )
     expect(response.call('text/html', ['<html></html>'])).to eq(status: 'omitted', reason: 'non-inertia-response')
     expect(response.call('application/json', ['"a string"'])).to eq(status: 'omitted', reason: 'unserializable')
     expect(response.call('application/json', ['{oops'])).to eq(status: 'omitted', reason: 'unserializable')
@@ -136,6 +148,43 @@ RSpec.describe Inertia::Core::Devtools::EntryBuilder do
 
     expect(entry[:__meta][:error]).to eq(class: 'RuntimeError', message: 'boom')
     expect(entry[:http][:responseBody]).to eq(status: 'omitted', reason: 'non-inertia-response')
+  end
+end
+
+RSpec.describe Inertia::Core::Devtools::Redactor do
+  let(:redactor) { described_class.new(filter: Inertia::Core::Devtools::KeyFilter.new(%w[password token])) }
+
+  it 'masks a matching key wherever it sits, and nothing that merely looks like one' do
+    expect(redactor.redact({ 'password' => 'x', 'user' => { 'token' => 'y', 'name' => 'z' } }))
+      .to eq('password' => '[REDACTED]', 'user' => { 'token' => '[REDACTED]', 'name' => 'z' })
+    expect(redactor.redact([{ password: 'x' }])).to eq([{ password: '[REDACTED]' }])
+    expect(redactor.redact({ 'password_hint' => 'x' })).to eq('password_hint' => 'x')
+    expect(redactor.redact('password')).to eq 'password'
+  end
+
+  it 'redacts a sensitive query parameter, nested keys included' do
+    expect(redactor.redact_url('http://x/?token=leaked&page=2')).to eq 'http://x/?token=%5BREDACTED%5D&page=2'
+    expect(redactor.redact_url('http://x/?user[token]=leaked')).to eq 'http://x/?user%5Btoken%5D=%5BREDACTED%5D'
+    expect(redactor.redact_url('http://x/users')).to eq 'http://x/users'
+  end
+
+  it 'drops a query it cannot parse instead of passing it through' do
+    expect(redactor.redact_url('http://x/?token=%zz')).to eq 'http://x/?[REDACTED]'
+  end
+
+  it 'redacts the URLs a payload carries under its own keys' do
+    payload = { __meta: { url: 'http://x/?token=leaked', redirectLocation: 'http://x/y?token=leaked' } }
+
+    expect(redactor.redact_payload(payload)[:__meta]).to eq(
+      url: 'http://x/?token=%5BREDACTED%5D', redirectLocation: 'http://x/y?token=%5BREDACTED%5D'
+    )
+  end
+
+  it 'replaces a value no JSON generator would take, leaf by leaf' do
+    sanitized = described_class.sanitize([Float::NAN, Float::INFINITY, (+"caf\xE9").force_encoding('UTF-8'), 'ok'])
+
+    expect(sanitized).to eq((['[UNSERIALIZABLE]'] * 3) + ['ok'])
+    expect { JSON.generate(sanitized) }.not_to raise_error
   end
 end
 

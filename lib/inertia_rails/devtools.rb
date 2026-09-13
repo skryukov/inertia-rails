@@ -1,5 +1,10 @@
 # frozen_string_literal: true
 
+require_relative 'devtools/redaction'
+require_relative 'devtools/source_locator'
+require_relative 'devtools/route_locator'
+require_relative 'devtools/component_path_locator'
+require_relative 'devtools/sources'
 require_relative 'devtools/exchange'
 require_relative 'devtools/entries_repository'
 require_relative 'devtools/recorder'
@@ -19,6 +24,7 @@ module InertiaRails
     EntryBuilder = Inertia::Core::Devtools::EntryBuilder
 
     ROUTE_PREFIX = '/_inertia/devtools'
+    RENDER_SOURCE_KEY = :__inertia_devtools_render_source
     REPOSITORY_MUTEX = Mutex.new
 
     class << self

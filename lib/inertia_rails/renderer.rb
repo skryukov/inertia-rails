@@ -105,7 +105,16 @@ module InertiaRails
     end
 
     def start_devtools_render(shared)
-      devtools&.render_started(component: @component, shared_keys: extract_shared_keys(shared))
+      devtools&.render_started(
+        component: @component,
+        render_source: route_render_source || Devtools::SourceLocator.caller_source(caller_locations(1, 40)),
+        shared_keys: extract_shared_keys(shared)
+      )
+    end
+
+    def route_render_source
+      source = @request.path_parameters[Devtools::RENDER_SOURCE_KEY]
+      source if source.is_a?(Hash) && source[:file] && source[:line]
     end
 
     def layout

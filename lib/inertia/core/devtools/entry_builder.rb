@@ -14,13 +14,15 @@ module Inertia
         TEXTUAL = %w[json text/ xml javascript].freeze
         EMPTY_ROUTE = { name: nil, uri: '', action: nil }.freeze
 
-        def initialize(exchange, id:, batch_id: nil, elapsed_ms: 0.0, prefetch: false, collector: nil, error: nil)
+        def initialize(exchange, id:, batch_id: nil, elapsed_ms: 0.0, prefetch: false, collector: nil,
+                       redactor: Redactor.new, error: nil)
           @exchange = exchange
           @id = id
           @batch_id = batch_id
           @elapsed_ms = elapsed_ms
           @prefetch = prefetch
           @collector = collector
+          @redactor = redactor
           @error = error
         end
 
@@ -30,8 +32,8 @@ module Inertia
           {
             __meta: meta,
             http: {
-              requestHeaders: header_strings(request_headers),
-              responseHeaders: header_strings(@exchange.headers),
+              requestHeaders: @redactor.redact_headers(request_headers),
+              responseHeaders: @redactor.redact_headers(@exchange.headers),
               requestBody: request_body,
               responseBody: response_body(page[:responseBody]),
             },
@@ -80,18 +82,13 @@ module Inertia
           end
         end
 
-        # Values flattened to the strings the extension shows.
-        def header_strings(headers)
-          headers.to_h { |name, value| [name, value.is_a?(Array) ? value.join(', ') : value.to_s] }
-        end
-
         def request_body
           if WRITE_METHODS.include?(@exchange.request_method) && !@exchange.inertia?
             return omitted('non-inertia-request')
           end
 
           parameters = @exchange.request_parameters
-          return present(parameters) unless parameters.nil? || parameters.empty?
+          return present(@redactor.redact(parameters)) unless parameters.nil? || parameters.empty?
 
           structured(@exchange.raw_request_body)
         rescue StandardError
@@ -104,7 +101,7 @@ module Inertia
           return omitted('non-inertia-response') if @error
           return raw_response_body unless @collector
 
-          page.nil? ? { status: 'empty' } : present(page)
+          page.nil? ? { status: 'empty' } : present(@redactor.redact(page))
         end
 
         def raw_response_body
@@ -118,8 +115,8 @@ module Inertia
           content_type.include?('json') ? structured(content) : omitted('non-inertia-response')
         end
 
-        # A raw body is kept only as JSON: keys are what a redaction pass can
-        # match, and an HTML page or a text blob can hide a secret under none.
+        # A raw body is kept only as JSON: keys are what the redactor matches,
+        # and an HTML page or a text blob can hide a secret under none.
         # The reason is one the extension has words for: to it, a body that
         # is not a JSON object is one that could not be serialized.
         def structured(content)
@@ -129,7 +126,7 @@ module Inertia
           decoded = JSON.parse(content)
           return omitted('unserializable') unless decoded.is_a?(Hash) || decoded.is_a?(Array)
 
-          present(decoded)
+          present(@redactor.redact(decoded))
         rescue JSON::ParserError
           omitted('unserializable')
         end

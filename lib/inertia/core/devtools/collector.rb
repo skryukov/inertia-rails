@@ -6,26 +6,24 @@ module Inertia
   module Core
     module Devtools
       # Watches one render's walk and, once the host hands over the page it
-      # built from it, assembles the entry's page half: a row per prop with
-      # what the ledger said about it, and the value each row points at.
+      # built from it, assembles the entry's page half: a badge row per prop
+      # and the value each row points at.
       class Collector < Observer
         MISSING = Object.new.freeze
-        # A row the ledger had nothing to add to. `inertiaType` is the
-        # extension's badge slot; it stays empty until a classifier reads
-        # the prop's kind and the page metadata into it.
-        PLAIN = { inertiaType: nil }.freeze
 
         attr_reader :component
 
-        def initialize(component:, render_source: nil, share_sources: {}, shared_keys: [],
-                       sources: Sources::NULL, host: Host.new)
+        def initialize(component:, deferred_request: false, render_source: nil, share_sources: {},
+                       shared_keys: [], sources: Sources::NULL, host: Host.new, redactor: Redactor.new)
           super()
           @component = component
+          @deferred_request = deferred_request
           @render_source = render_source
           @share_sources = share_sources
           @shared_keys = shared_keys
           @sources = sources
           @host = host
+          @redactor = redactor
           @ledger = Ledger::EMPTY
           @page = nil
           @metadata = nil
@@ -43,7 +41,7 @@ module Inertia
         end
 
         def build
-          rows = verdict_rows
+          rows = badge_rows
 
           {
             component: @component,
@@ -57,10 +55,10 @@ module Inertia
 
         private
 
-        # Every top-level page prop gets a row; a nested one only when the
-        # ledger has something to say about it. A rescued prop has no value
-        # on the page but keeps its row.
-        def verdict_rows
+        # Every top-level page prop gets a row; a nested one only when badged.
+        # A rescued prop has no value on the page but keeps its row.
+        def badge_rows
+          classifier = PropClassifier.new(@metadata, deferred_request: @deferred_request)
           rows = {}
 
           @ledger.each do |entry|
@@ -70,27 +68,18 @@ module Inertia
             rescued = @ledger.rescued?(path)
             next unless rescued || !dig(page_props, path).equal?(MISSING)
 
-            verdict = verdict(entry, rescued: rescued)
-            next if path.include?('.') && verdict == PLAIN
+            badge = classifier.classify(path, entry.prop, reset: entry.reset?, rescued: rescued)
+            next if path.include?('.') && badge == PropClassifier::PLAIN
 
-            rows[path] = row(path, verdict)
+            rows[path] = row(path, badge)
           end
 
-          page_props.each_key { |key| rows[key.to_s] ||= row(key.to_s, PLAIN) }
+          page_props.each_key { |key| rows[key.to_s] ||= row(key.to_s, PropClassifier::PLAIN) }
           rows
         end
 
-        # What the walk decided about the prop. Its badge — the kind, the
-        # defer group, how the metadata says it merges — is not read here.
-        def verdict(entry, rescued:)
-          verdict = PLAIN.dup
-          verdict[:reset] = true if entry.reset?
-          verdict[:rescued] = true if rescued
-          verdict
-        end
-
-        def row(path, verdict)
-          row = { shared: @shared_keys.include?(path) }.merge(verdict)
+        def row(path, badge)
+          row = { shared: @shared_keys.include?(path) }.merge(badge)
           if (source = @share_sources[path])
             row[:shareSource] = source
           elsif !row[:shared] && (line = render_line(path))
@@ -104,8 +93,10 @@ module Inertia
         end
 
         def values(paths)
+          redacted = @redactor.redact(page_props)
+
           paths.each_with_object({}) do |path, values|
-            value = dig(page_props, path)
+            value = dig(redacted, path)
             values[path] = value unless value.equal?(MISSING)
           end
         end

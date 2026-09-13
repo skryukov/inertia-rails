@@ -34,11 +34,15 @@ module InertiaRails
       def inertia_share(hash = nil, **props, &block)
         options = props.slice(:if, :unless, :only, :except)
         data = hash || props.except(:if, :unless, :only, :except)
+        # The share site, for the DevTools editor link.
+        source = InertiaRails::Devtools::SourceLocator.caller_source(caller_locations(1, 30))
 
         before_action(**options) do
           @_inertia_shared ||= []
           @_inertia_shared << data.freeze if data.any?
           @_inertia_shared << block if block
+
+          InertiaRails::Devtools.recorder(request)&.share_source(data.keys, source) if data.any?
         end
       end
 
@@ -78,6 +82,10 @@ module InertiaRails
       @_inertia_shared ||= []
       @_inertia_shared << props.freeze unless props.empty?
       @_inertia_shared << block if block
+
+      if (recorder = InertiaRails::Devtools.recorder(request))
+        recorder.share_source(props.keys, InertiaRails::Devtools::SourceLocator.caller_source)
+      end
     end
 
     def default_render
@@ -169,11 +177,15 @@ module InertiaRails
           {}
         end
 
+      recorder = InertiaRails::Devtools.recorder(request)
+
       (@_inertia_shared || []).filter_map do |shared_data|
-        if shared_data.respond_to?(:call)
-          instance_exec(&shared_data)
-        else
-          shared_data
+        next shared_data unless shared_data.respond_to?(:call)
+
+        instance_exec(&shared_data).tap do |result|
+          next unless recorder && result.respond_to?(:keys)
+
+          recorder.share_source(result.keys, InertiaRails::Devtools::SourceLocator.block_source(shared_data))
         end
       end.reduce(initial_data, &:merge)
     end

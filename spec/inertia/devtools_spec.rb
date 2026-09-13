@@ -236,27 +236,77 @@ RSpec.describe 'InertiaRails DevTools', type: :request do
         expect(recorded['__meta']['serverTimingMs']).to be_a(Numeric)
       end
 
+      it 'badges props by their type' do
+        props = recorded['props']
+
+        expect(props['always']).to include('inertiaType' => 'always', 'shared' => false)
+        expect(props['items']).to include('inertiaType' => 'merge', 'mergeDirection' => 'append')
+        expect(props['prepended']).to include('inertiaType' => 'merge', 'mergeDirection' => 'prepend')
+        expect(props['matched']).to include('inertiaType' => 'merge', 'mergeDirection' => 'append', 'deepMerge' => true)
+        expect(props['deep']).to include('inertiaType' => 'merge', 'mergeDirection' => 'append', 'deepMerge' => true)
+        expect(props['settings']).to include('inertiaType' => 'once', 'once' => true)
+        expect(props['users']).to include('inertiaType' => 'scroll', 'mergeDirection' => 'append')
+        expect(props['feed']).to include('inertiaType' => nil, 'live' => true)
+        expect(props['name']).to include('inertiaType' => nil, 'shared' => false)
+        expect(props['nested']).to include('inertiaType' => nil, 'shared' => false)
+      end
+
       it 'leaves props omitted from a first load to the request that delivers them' do
         expect(recorded['props'].keys).not_to include('optional', 'deferred')
       end
 
-      it 'flags a reset prop' do
+      it 'badges a deferred prop on the request that delivers it' do
+        get devtools_props_path, headers: partial_headers('deferred', 'X-Inertia-Devtools-Deferred' => '1')
+
+        expect(entry['props']['deferred']).to include('inertiaType' => 'defer', 'deferGroup' => 'stats')
+        expect(entry['propValues']['deferred']).to eq 'deferred param'
+      end
+
+      it 'drops the defer type on a manual partial reload' do
+        get devtools_props_path, headers: partial_headers('deferred', 'optional')
+
+        expect(entry['props']['deferred']['inertiaType']).to be_nil
+        expect(entry['props']['deferred']).not_to have_key('deferGroup')
+        expect(entry['props']['optional']).to include('inertiaType' => 'optional')
+      end
+
+      it 'keeps the group of a deferred scroll prop' do
+        get deferred_scroll_test_custom_group_path, headers: {
+          'X-Inertia' => true,
+          'X-Inertia-Partial-Component' => 'TestComponent',
+          'X-Inertia-Partial-Data' => 'users',
+          'X-Inertia-Devtools-Deferred' => '1',
+        }
+
+        expect(entry['props']['users']).to include('inertiaType' => 'scroll', 'deferGroup' => 'custom')
+      end
+
+      it 'flags a reset prop and drops its merge direction' do
         get devtools_props_path, headers: partial_headers('items', 'X-Inertia-Reset' => 'items')
 
-        expect(entry['props']['items']).to include('reset' => true)
+        expect(entry['props']['items']).to include('inertiaType' => 'merge', 'reset' => true)
+        expect(entry['props']['items']).not_to have_key('mergeDirection')
       end
 
       it 'flags a rescued prop without a value' do
         get devtools_rescued_path, headers: partial_headers('permissions', 'X-Inertia-Devtools-Deferred' => '1')
 
-        expect(entry['props']['permissions']).to include('rescued' => true)
+        expect(entry['props']['permissions']).to include('inertiaType' => 'defer', 'rescued' => true)
         expect(entry['propValues']).not_to have_key('permissions')
         expect(entry['http']['responseBody']['value']['rescuedProps']).to eq ['permissions']
       end
 
-      it 'flags shared props' do
+      it 'flags shared props and links them to their share call' do
         expect(recorded['props']['app_name']).to include('shared' => true)
-        expect(recorded['props']['name']).to include('shared' => false, 'inertiaType' => nil)
+        expect(recorded['props']['app_name']['shareSource']['file'])
+          .to end_with('inertia_devtools_test_controller.rb')
+      end
+
+      it 'links a rendered prop to the line it is declared on' do
+        source = recorded['props']['name']['renderSource']
+
+        expect(source['file']).to end_with('inertia_devtools_test_controller.rb')
+        expect(File.readlines(source['file'])[source['line'] - 1]).to include('name:')
       end
 
       it 'records the resolved values' do
@@ -275,16 +325,148 @@ RSpec.describe 'InertiaRails DevTools', type: :request do
         )
       end
 
+      it 'resolves the route' do
+        expect(recorded['route']).to include(
+          'name' => 'devtools_props',
+          'uri' => '/devtools_props',
+          'action' => 'InertiaDevtoolsTestController#props'
+        )
+        expect(recorded['route']['actionSource']['file']).to end_with('inertia_devtools_test_controller.rb')
+      end
+
       it 'captures the page object as the response body' do
         expect(recorded['http']['responseBody']['value']).to include('component' => 'DevtoolsComponent')
       end
     end
 
-    describe 'bodies' do
+    # The source is captured when the routes are drawn, so this needs a redraw with
+    # recording on — and another on the way out, or every later example sees the key.
+    describe 'routes drawn while recording' do
+      around do |example|
+        Rails.application.reload_routes!
+        example.run
+      ensure
+        InertiaRails.configuration.devtools = false
+        Rails.application.reload_routes!
+      end
+
+      it 'links route-defined renders to the route definition' do
+        get inertia_route_path, headers: { 'X-Inertia' => true }
+        source = entry['renderSource']
+
+        expect(source['file']).to end_with('config/routes.rb')
+        expect(File.readlines(source['file'])[source['line'] - 1]).to include("inertia 'inertia_route'")
+      end
+    end
+
+    describe 'prop rows' do
+      it 'keeps one row per top-level prop regardless of nesting' do
+        get devtools_nested_share_path
+        paths = entry['props'].keys
+
+        expect(paths).to include('auth', 'auth.badge', 'plain_nested')
+        expect(paths).not_to include('auth.user', 'auth.user.profile.city', 'plain_nested.a.b.c')
+        expect(entry['props']['auth.badge']).to include('shared' => false, 'inertiaType' => 'always')
+        expect(entry['props']['auth']['shareSource']['file']).to end_with('inertia_devtools_test_controller.rb')
+      end
+
+      it 'duplicates only nested values that carry metadata' do
+        get devtools_nested_share_path
+
+        expect(entry['propValues']['auth']).to eq(
+          'badge' => 'A',
+          'user' => { 'id' => 1, 'profile' => { 'city' => 'Portland' } }
+        )
+        expect(entry['propValues'].slice('auth.badge')).to eq('auth.badge' => 'A')
+      end
+
+      it 'keys array paths by their index in the rendered array' do
+        get devtools_collection_path
+        recorded = entry
+        rows = recorded['http']['responseBody']['value']['props']['rows']
+
+        expect(rows.length).to eq 3
+        expect(recorded['propValues']['rows.1.tag']).to eq rows[1]['tag']
+        expect(recorded['propValues']['rows.2.tag']).to eq rows[2]['tag']
+        expect(recorded['props'].keys).not_to include('rows.0.hidden')
+      end
+    end
+
+    describe 'redaction' do
+      it 'redacts sensitive props, headers, and query parameters' do
+        get "#{devtools_props_path}?token=leaked", headers: { 'Authorization' => 'Bearer x', 'Cookie' => 'a=b' }
+        recorded = entry
+
+        expect(recorded['propValues']['password']).to eq '[REDACTED]'
+        expect(recorded['http']['requestHeaders']['authorization']).to eq '[REDACTED]'
+        expect(recorded['http']['requestHeaders']['cookie']).to eq '[REDACTED]'
+        expect(recorded['__meta']['url']).to include('token=%5BREDACTED%5D')
+      end
+
+      it 'redacts keys inside a captured non-Inertia response body' do
+        get devtools_plain_path
+        expect(entry['http']['responseBody']['value']).to eq('ok' => true, 'token' => '[REDACTED]')
+      end
+
       it 'omits a non-Inertia response body it cannot redact by key' do
         get non_inertiafied_path
 
         expect(entry['http']['responseBody']).to eq('status' => 'omitted', 'reason' => 'non-inertia-response')
+      end
+
+      it 'redacts the query of a full-page location redirect' do
+        get "#{devtools_props_path}?token=leaked",
+            headers: { 'X-Inertia' => true, 'X-Inertia-Version' => 'stale' }
+
+        expect(response.status).to eq 409
+        expect(entry['http']['responseHeaders']['x-inertia-location']).to include('token=%5BREDACTED%5D')
+      end
+
+      it 'honors the app filter_parameters list' do
+        get devtools_props_path
+
+        expect(entry['propValues']['ssn']).to eq '[REDACTED]'
+      end
+
+      it 'redacts nested values recorded under flattened dot paths' do
+        get devtools_props_path
+
+        expect(entry['props']['secrets.token']).to include('inertiaType' => 'always')
+        expect(entry['propValues']['secrets.token']).to eq '[REDACTED]'
+      end
+
+      it 'keeps metadata for props named like sensitive keys' do
+        get devtools_props_path
+
+        expect(entry['props']['password']).to include('shared' => false)
+      end
+
+      it 'drops an unparseable query instead of persisting it raw' do
+        expect(InertiaRails::Devtools::Redaction.redact_url('http://x/?token=%zz'))
+          .to eq 'http://x/?[REDACTED]'
+      end
+
+      it 'redacts sensitive keys nested in query parameters' do
+        get "#{devtools_props_path}?user[token]=leaked"
+
+        expect(entry['__meta']['url']).to include('user%5Btoken%5D=%5BREDACTED%5D')
+      end
+
+      it 'redacts the query of URLs carried in headers' do
+        post devtools_create_path, headers: { 'X-Inertia' => true, 'Referer' => 'http://ex.com/r?token=leaked' }
+        recorded = entry
+
+        expect(recorded['http']['requestHeaders']['referer']).to eq 'http://ex.com/r?token=%5BREDACTED%5D'
+        expect(recorded['http']['responseHeaders']['location']).to include('token=%5BREDACTED%5D')
+      end
+
+      it 'redacts a raw body Rails did not parse' do
+        post devtools_create_path, params: '{"password":"hunter2"}',
+                                   headers: { 'X-Inertia' => true, 'CONTENT_TYPE' => 'text/plain' }
+
+        expect(entry['http']['requestBody']).to eq(
+          'status' => 'present', 'value' => { 'password' => '[REDACTED]' }
+        )
       end
 
       it 'omits an unstructured body rather than storing it raw' do
@@ -292,6 +474,25 @@ RSpec.describe 'InertiaRails DevTools', type: :request do
                                    headers: { 'X-Inertia' => true, 'CONTENT_TYPE' => 'text/plain' }
 
         expect(entry['http']['requestBody']).to eq('status' => 'omitted', 'reason' => 'unserializable')
+      end
+    end
+
+    describe 'unserializable values' do
+      it 'replaces a leaf instead of suppressing recording' do
+        get devtools_plain_path
+        get devtools_plain_path, headers: { 'X-Weird' => (+"caf\xE9").force_encoding('ASCII-8BIT') }
+        get devtools_plain_path
+
+        expect(entries.length).to eq 3
+      end
+
+      it 'replaces non-finite floats and invalid encodings' do
+        sanitized = InertiaRails::Devtools::Redaction.sanitize(
+          [Float::NAN, Float::INFINITY, (+"caf\xE9").force_encoding('UTF-8')]
+        )
+
+        expect(sanitized).to eq(['[UNSERIALIZABLE]'] * 3)
+        expect { JSON.generate(sanitized) }.not_to raise_error
       end
     end
 
@@ -538,6 +739,16 @@ RSpec.describe 'InertiaRails DevTools', type: :request do
       expect(InertiaRails::Devtools.repository.get(id)['route']).to eq(
         'name' => nil, 'uri' => '', 'action' => nil
       )
+    end
+
+    it 'returns an absolute component path' do
+      root = File.join(storage_path, 'pages')
+      file = File.join(root, 'AbsoluteComponent.vue')
+      FileUtils.mkdir_p(root)
+      File.write(file, '')
+      InertiaRails.configuration.devtools_component_paths = [root]
+
+      expect(InertiaRails::Devtools::ComponentPathLocator.resolve('AbsoluteComponent')).to eq file
     end
 
     it 'rebuilds a corrupt metadata index from entry files' do

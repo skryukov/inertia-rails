@@ -14,10 +14,11 @@ module Inertia
 
         attr_reader :env, :id, :collector, :exception
 
-        def initialize(env, repository:, host: Host.new, sources: Sources::NULL, limits: {})
+        def initialize(env, repository:, host: Host.new, redactor: Redactor.new, sources: Sources::NULL, limits: {})
           @env = env
           @repository = repository
           @host = host
+          @redactor = redactor
           @sources = sources
           @limits = limits
           @id = Ulid.generate
@@ -46,17 +47,17 @@ module Inertia
           ((Process.clock_gettime(Process::CLOCK_MONOTONIC) - @started_at) * 1000).round(3)
         end
 
-        # `render_source` is the `{ file:, line: }` of the render call, when
-        # the host located it.
-        def render_started(component:, shared_keys:, render_source: nil)
+        def render_started(component:, render_source:, shared_keys:)
           swallow do
             @collector = Collector.new(
               component: component,
+              deferred_request: !Headers.read(@env, Headers::DEFERRED).nil?,
               render_source: render_source,
               share_sources: @share_sources,
               shared_keys: shared_keys,
               sources: @sources,
-              host: @host
+              host: @host,
+              redactor: @redactor
             )
           end
         end
@@ -69,8 +70,7 @@ module Inertia
           end
         end
 
-        # The page carries the values the client receives; the metadata says
-        # how each prop merges.
+        # The page carries the values the client receives; the metadata carries the badges.
         def page_rendered(page, metadata = nil)
           @collector&.page_rendered(page, metadata)
         end
@@ -130,7 +130,7 @@ module Inertia
         def build_entry(status, headers, body, error)
           EntryBuilder.new(exchange(status, headers, body),
                            id: @id, batch_id: batch_id, elapsed_ms: elapsed_ms, prefetch: prefetch?,
-                           collector: @collector, error: error).build
+                           collector: @collector, redactor: @redactor, error: error).build
         end
 
         def inertia_request?
@@ -180,12 +180,10 @@ module Inertia
           headers[key] = content.bytesize.to_s if key
         end
 
-        # The entry goes to disk as built. A value JSON refuses costs the
-        # whole entry (reported, never the response) until a storage pass
-        # scrubs leaves.
         def persist(entry)
           swallow do
-            @repository.record(@id, entry, tab_uuid: Headers.read(@env, Headers::TAB), **@limits)
+            @repository.record(@id, @redactor.redact_payload(entry),
+                               tab_uuid: Headers.read(@env, Headers::TAB), **@limits)
             @repository.prune_if_due
           end
         end

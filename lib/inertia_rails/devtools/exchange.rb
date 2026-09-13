@@ -3,7 +3,7 @@
 module InertiaRails
   module Devtools
     # What Rails knows about the exchange that the protocol does not: the method a
-    # form override renamed, the parameters ActionDispatch parsed, the body it buffered.
+    # form override renamed, the parameters ActionDispatch parsed, the route matched.
     class Exchange < Inertia::Core::Devtools::Exchange
       def initialize(env, **response)
         super
@@ -28,6 +28,10 @@ module InertiaRails
 
       def response_content
         Devtools.buffered_body(env, body)
+      end
+
+      def route
+        RouteLocator.resolve(@request)
       end
 
       private

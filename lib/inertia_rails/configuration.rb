@@ -45,6 +45,18 @@ module InertiaRails
     option :devtools_authorize, nil, evaluate: false
     option :devtools_silence_logs, true
 
+    option :devtools_redact_keys, %w[
+      password password_confirmation current_password
+      token _token access_token refresh_token
+      secret client_secret api_key
+    ].freeze
+    option :devtools_redact_headers, %w[
+      cookie set-cookie authorization proxy-authorization x-xsrf-token x-csrf-token
+    ].freeze
+
+    # Directories searched for the page file backing a component.
+    option :devtools_component_paths, nil
+
     DEFAULTS = options.freeze
     OPTION_NAMES = option_names.freeze
 

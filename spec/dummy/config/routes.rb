@@ -8,6 +8,8 @@ Rails.application.routes.draw do
   get 'devtools_plain' => 'inertia_devtools_test#plain', as: :devtools_plain
   post 'devtools_create' => 'inertia_devtools_test#create', as: :devtools_create
   get 'devtools_boom' => 'inertia_devtools_test#boom', as: :devtools_boom
+  get 'devtools_nested_share' => 'inertia_devtools_test#nested_share', as: :devtools_nested_share
+  get 'devtools_collection' => 'inertia_devtools_test#collection', as: :devtools_collection
   get 'devtools_oversized' => 'inertia_devtools_test#oversized', as: :devtools_oversized
   get 'devtools_cached' => 'inertia_devtools_test#cached', as: :devtools_cached
 

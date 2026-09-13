@@ -17,6 +17,7 @@ class InertiaDevtoolsTestController < ApplicationController
       deep: InertiaRails.deep_merge { { count: 1 } },
       settings: InertiaRails.once { 'once param' },
       users: InertiaRails.scroll(pagy) { [{ id: 1, name: 'User 1' }] },
+      feed: InertiaRails.live(on: 'updated', channel: 'feed') { 'live param' },
       nested: { first: 'first nested param' },
       secrets: { token: InertiaRails.always { 'nested secret' } },
     }
@@ -26,6 +27,25 @@ class InertiaDevtoolsTestController < ApplicationController
     render inertia: 'DevtoolsComponent', props: {
       name: 'Brandon',
       permissions: InertiaRails.defer(rescue: true) { raise 'boom' },
+    }
+  end
+
+  def nested_share
+    inertia_share auth: {
+      badge: InertiaRails.always { 'A' },
+      user: { id: 1, profile: { city: 'Portland' } },
+    }
+
+    render inertia: 'DevtoolsComponent', props: { plain_nested: { a: { b: { c: 1 } } } }
+  end
+
+  def collection
+    render inertia: 'DevtoolsComponent', props: {
+      rows: [
+        { hidden: InertiaRails.optional { 'never on a first load' } },
+        { name: 'first', tag: InertiaRails.always { 'A' } },
+        { name: 'second', tag: InertiaRails.always { 'B' } }
+      ],
     }
   end
 
