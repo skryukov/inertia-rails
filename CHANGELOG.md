@@ -13,6 +13,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 * Convert external (cross-origin) redirects to Inertia location responses automatically (disable with `config.convert_external_redirects = false`), and add `redirect_to url, inertia: { full_page: true }` for same-origin redirects to non-Inertia endpoints (@skryukov)
 * Read the origin the client reached from the headers a proxy forwards (`X-Forwarded-Proto`, `X-Forwarded-Host`, `X-Forwarded-Port`) when deciding whether a redirect leaves the app and when sending a stale client back to its URL, so same-origin redirects behind a proxy are no longer turned into full page visits (@skryukov)
 * Fix `inertia_location` to redirect plain (non-Inertia) requests instead of responding `409 Conflict`, and stop stale asset versions from replacing location responses with a forced refresh (@skryukov)
+* Fix the forced refresh on a stale asset version discarding the headers the app set — `Set-Cookie`, cache and CSP headers now survive the `409`, as they already did on the external-redirect `409` — and carry `X-Inertia-Version` on both location responses (@skryukov)
 * Fix meta tags ignoring per-controller `use_data_inertia_head_attribute` set via `inertia_config` (@skryukov)
 * Use SHA256 instead of MD5 for meta tag head key digests, so they no longer raise on FIPS-enabled Rubies (@skryukov)
 * Restart the SSR server promptly in the Puma plugin when the process dies during boot, instead of polling a dead port for the full boot timeout (@skryukov)

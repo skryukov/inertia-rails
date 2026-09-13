@@ -24,7 +24,9 @@ module InertiaRails
                                   @app.call(@env)
                                 end
 
-        status, headers, body = convert_to_location_response!(headers, body) if external_redirect?(status, headers)
+        if external_redirect?(status, headers)
+          status, headers, body = location_response!(headers, body, url: headers.delete('Location'))
+        end
 
         # Inertia session data is added via redirect_to
         # Guard with session.loaded? to avoid forcing session I/O (and unnecessary
@@ -41,7 +43,7 @@ module InertiaRails
 
         # A response with X-Inertia-Location is already a full page visit — nothing to refresh.
         if stale_inertia_get? && !headers['X-Inertia-Location']
-          force_refresh
+          force_refresh(headers, body)
         else
           [status, headers, body]
         end
@@ -77,13 +79,16 @@ module InertiaRails
         false
       end
 
-      # Mutates the headers in place to keep the rest of the response, notably
-      # Set-Cookie (which matters mid-OAuth).
-      def convert_to_location_response!(headers, body)
-        headers['X-Inertia-Location'] = headers.delete('Location')
+      # Tells the client to make a full page visit to `url`. Mutates the headers
+      # in place to keep the rest of the response, notably Set-Cookie (which
+      # matters mid-OAuth) and any cache or CSP headers the app set.
+      def location_response!(headers, body, url:)
         headers.delete('Content-Type')
         headers.delete('Content-Length')
         body.close if body.respond_to?(:close)
+
+        headers['X-Inertia-Location'] = url
+        headers['X-Inertia-Version'] = server_version.to_s unless server_version.nil?
 
         [409, headers, []]
       end
@@ -163,9 +168,9 @@ module InertiaRails
         server_version.is_a?(Numeric) ? version.to_f : version
       end
 
-      def force_refresh
+      def force_refresh(headers, body)
         request.flash.keep
-        Rack::Response.new('', 409, { 'X-Inertia-Location' => origin.url }).finish
+        location_response!(headers, body, url: origin.url)
       end
 
       def copy_xsrf_to_csrf!

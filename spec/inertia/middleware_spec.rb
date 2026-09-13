@@ -27,6 +27,16 @@ RSpec.describe 'InertiaRails::Middleware', type: :request do
       expect(response.headers['X-Inertia-Location']).to eq 'http://[::1]:3000/empty_test'
     end
 
+    it 'keeps the headers the app set on the forced refresh' do
+      get render_with_cookie_test_path, headers: { 'X-Inertia' => true, 'X-Inertia-Version' => 'stale' }
+
+      expect(response.status).to eq 409
+      expect(response.headers['X-Inertia-Location']).to eq request.original_url
+      expect(response.headers['X-App-Header']).to eq 'kept'
+      expect(cookies['app_cookie']).to eq 'hello'
+      expect(response.headers['X-Inertia-Version']).to eq '1.0'
+    end
+
     it 'returns page when version is up to date' do
       get empty_test_path, headers: { 'X-Inertia' => true, 'X-Inertia-Version' => '1.0' }
 
@@ -285,6 +295,7 @@ RSpec.describe 'InertiaRails::Middleware', type: :request do
 
           expect(response.status).to eq 409
           expect(response.headers['X-Inertia-Location']).to eq 'http://external-website.com/some_path'
+          expect(response.headers['X-Inertia-Version']).to eq '1.0'
         end
       end
 

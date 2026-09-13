@@ -22,6 +22,7 @@ Rails.application.routes.draw do
   get 'with_inline_layout' => 'inertia_test#with_inline_layout'
   get 'without_layout' => 'inertia_test#without_layout'
   get 'redirect_test' => 'inertia_test#redirect_test'
+  get 'render_with_cookie_test' => 'inertia_test#render_with_cookie_test'
   get 'inertia_request_test' => 'inertia_test#inertia_request_test'
   get 'session_loaded_request_test' => 'inertia_test#session_loaded_request_test'
   get 'http_cache_test' => 'inertia_test#http_cache_test'
