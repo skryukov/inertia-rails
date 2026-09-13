@@ -15,15 +15,21 @@ In short: **cached props skip computing**, **once props skip sending**, **HTTP c
 
 These strategies are independent. A prop can be both cached on the server and marked as once so the client doesn't re-request it. HTTP caching can wrap an entire response that contains cached props. SSR caching can be layered on top of any combination.
 
-### Why only `defer` and `optional` support the `cache` option
+### Which prop types support the `cache` option
 
-The `cache` option is available on [deferred](/guide/deferred-props) and [optional](/guide/partial-reloads#lazy-data-evaluation) props because these represent data that is loaded on demand — caching their result avoids re-evaluating expensive blocks on repeated requests.
+Every prop type except `scroll` accepts the `cache` option — caching decorates how the value is computed and is independent of how it is delivered:
 
-Other prop types don't need it:
+```ruby
+InertiaRails.defer(cache: 'feed') { current_user.feed }
+InertiaRails.once(cache: 'countries') { Country.all }
+InertiaRails.merge(cache: 'toplist') { Post.top }
+InertiaRails.always(cache: 'nav') { NavigationItem.tree }
+```
 
-- **Once props** already skip evaluation when the client has the data. If the computation itself is expensive, use `InertiaRails.cache` directly in the block.
-- **Always props** are meant for cheap, frequently-changing data (flash messages, auth state). If the data is expensive enough to cache, it probably shouldn't be `always`.
-- **Merge and scroll props** describe how the client handles the data, not how the server computes it. If the underlying data is expensive, wrap it with `InertiaRails.cache` and pass the result.
+Two notes:
+
+- **Once props** layer two expirations. In `InertiaRails.once(cache: { key: 'plans', expires_in: 1.hour }, expires_in: 30.minutes) { Plan.all }`, the inner `expires_in` belongs to the server cache entry and the outer one to the client's copy: the client refetches after 30 minutes, but the server answers from the cache until the hour passes — lower the cache expiry when a refetch must see fresh data.
+- **Scroll props** refuse the option: pagination data changes per page and the merge direction per request, so a static cache key would pin one page. Cache inside the block with `Rails.cache.fetch`, keying on the page.
 
 ## HTTP Caching
 

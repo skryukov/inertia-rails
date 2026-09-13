@@ -2,7 +2,7 @@
 
 RSpec.shared_examples 'base prop' do
   describe '#call' do
-    subject(:call) { prop.call(controller) }
+    subject(:call) { evaluate(prop, controller) }
     let(:prop) { described_class.new { 'block' } }
     let(:headers) { {} }
     let(:controller) do

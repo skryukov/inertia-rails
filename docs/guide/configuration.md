@@ -34,7 +34,7 @@ end
 
 Inertia Rails supports setting any configuration option via environment variables out of the box. For each option in the configuration, you can set an environment variable prefixed with `INERTIA_` and the option name in uppercase. For example: `INERTIA_SSR_ENABLED`.
 
-**Boolean values** (like `INERTIA_DEEP_MERGE_SHARED_DATA` or `INERTIA_SSR_ENABLED`) are parsed from the strings `"true"` or `"false"` (case-sensitive).
+**Boolean values** (like `INERTIA_DEEP_MERGE_SHARED_DATA` or `INERTIA_SSR_ENABLED`) are parsed from the strings `"true"`/`"false"`, `"1"`/`"0"`, `"yes"`/`"no"` and `"on"`/`"off"` (case-insensitive). Options whose default is a number are parsed as numbers.
 
 ## Configuration Options
 
@@ -48,28 +48,10 @@ Use `component_path_resolver` to customize component path resolution when [`defa
 
 **Default**: `->(props:) { props }`
 
-Use `prop_transformer` to apply a transformation to your props before they're sent to the view. One use-case this enables is to work with `snake_case` props within Rails while working with `camelCase` in your view:
+`prop_transformer` receives the fully-resolved prop hash and returns a transformed hash before it's sent to the page. Transforming prop _values_ is safe; **renaming keys is not**. Inertia's [partial reload](/guide/partial-reloads) metadata (`deferredProps`, `mergeProps`, and so on) is keyed by the original prop names and is not remapped, so renamed keys desync from the metadata that points at them.
 
-```ruby
-  inertia_config(
-    prop_transformer: lambda do |props:|
-      props.deep_transform_keys { |key| key.to_s.camelize(:lower) }
-    end
-  )
-```
-
-> [!NOTE]
-> This controls the props provided by Inertia Rails but does not concern itself with props coming _into_ Rails. You may want to add a global `before_action` to `ApplicationController`:
-
-```ruby
-before_action :underscore_params
-
-# ...
-
-def underscore_params
-  params.deep_transform_keys! { |key| key.to_s.underscore }
-end
-```
+> [!WARNING]
+> Don't use `prop_transformer` to convert keys between `snake_case` and `camelCase`. It only ever sees the resolved props, so the metadata paths — and every value coming _into_ Rails from forms and partial reloads — stay in `snake_case`, and deferred props, merges, infinite scroll, and form submissions silently break. For full `snake_case` ↔ `camelCase` conversion, use [`inertia-caseshift`](https://github.com/skryukov/inertia-caseshift), which handles the entire round-trip on the client. See [Key Casing](/guide/serialization#key-casing).
 
 ### `cache_store`
 
@@ -219,7 +201,7 @@ end
 ```
 
 > [!NOTE]
-> The origin comparison relies on the request scheme as Rails sees it (`X-Forwarded-Proto` is honored, as it is everywhere in Rails). If your app is behind a proxy, make sure it forwards this header — otherwise every absolute `https://` redirect to your own host will look cross-origin and trigger a full page visit.
+> The origin comparison follows the headers a proxy forwards — `X-Forwarded-Proto` (the first entry, the one the client faced), `X-Forwarded-Host`, and `X-Forwarded-Port` — because that is the origin your app builds its absolute URLs from. If your app is behind a proxy, make sure it forwards them; otherwise an absolute `https://` redirect to your own host looks cross-origin and triggers a full page visit.
 
 ### `flash_keys`
 

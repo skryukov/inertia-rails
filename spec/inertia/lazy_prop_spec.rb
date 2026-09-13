@@ -17,7 +17,7 @@ RSpec.describe InertiaRails::LazyProp do
   end
 
   describe '#call' do
-    subject(:call) { prop.call(controller) }
+    subject(:call) { evaluate(prop, controller) }
     let(:prop) { described_class.new('value') }
     let(:controller) { ApplicationController.new }
 

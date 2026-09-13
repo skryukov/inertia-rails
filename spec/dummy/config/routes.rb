@@ -3,6 +3,16 @@
 Rails.application.routes.draw do
   mount InertiaRails::Engine => '/inertia-rails'
 
+  get 'devtools_props' => 'inertia_devtools_test#props', as: :devtools_props
+  get 'devtools_rescued' => 'inertia_devtools_test#rescued', as: :devtools_rescued
+  get 'devtools_plain' => 'inertia_devtools_test#plain', as: :devtools_plain
+  post 'devtools_create' => 'inertia_devtools_test#create', as: :devtools_create
+  get 'devtools_boom' => 'inertia_devtools_test#boom', as: :devtools_boom
+  get 'devtools_nested_share' => 'inertia_devtools_test#nested_share', as: :devtools_nested_share
+  get 'devtools_collection' => 'inertia_devtools_test#collection', as: :devtools_collection
+  get 'devtools_oversized' => 'inertia_devtools_test#oversized', as: :devtools_oversized
+  get 'devtools_cached' => 'inertia_devtools_test#cached', as: :devtools_cached
+
   get 'configuration' => 'inertia_config_test#configuration'
   get 'props' => 'inertia_render_test#props'
   get 'ssr_cache_disabled' => 'inertia_render_test#ssr_cache_disabled'
@@ -22,6 +32,7 @@ Rails.application.routes.draw do
   get 'with_inline_layout' => 'inertia_test#with_inline_layout'
   get 'without_layout' => 'inertia_test#without_layout'
   get 'redirect_test' => 'inertia_test#redirect_test'
+  get 'render_with_cookie_test' => 'inertia_test#render_with_cookie_test'
   get 'inertia_request_test' => 'inertia_test#inertia_request_test'
   get 'session_loaded_request_test' => 'inertia_test#session_loaded_request_test'
   get 'http_cache_test' => 'inertia_test#http_cache_test'

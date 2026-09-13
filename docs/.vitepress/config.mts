@@ -139,6 +139,7 @@ export default withMermaid({
         {
           text: 'Data & Props',
           items: [
+            { text: 'Serialization', link: '/guide/serialization' },
             { text: 'Shared data', link: '/guide/shared-data' },
             { text: 'Flash data', link: '/guide/flash-data' },
             { text: 'Partial reloads', link: '/guide/partial-reloads' },
@@ -150,6 +151,7 @@ export default withMermaid({
             { text: 'Once props', link: '/guide/once-props' },
             { text: 'Cached props', link: '/guide/cached-props' },
             { text: 'Infinite scroll', link: '/guide/infinite-scroll' },
+            { text: 'Live props', link: '/guide/live-props' },
             { text: 'Remembering state', link: '/guide/remembering-state' },
           ],
         },

@@ -27,6 +27,12 @@ class InertiaTestController < ApplicationController
     redirect_to :empty_test
   end
 
+  def render_with_cookie_test
+    cookies['app_cookie'] = 'hello'
+    response.headers['X-App-Header'] = 'kept'
+    render inertia: 'EmptyTestComponent'
+  end
+
   def external_redirect_test
     redirect_to 'http://external-website.com/some_path', allow_other_host: true
   end

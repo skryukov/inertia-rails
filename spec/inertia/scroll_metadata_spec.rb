@@ -1,5 +1,9 @@
 # frozen_string_literal: true
 
+# `ScrollMetadata` itself is covered in the core suite
+# (`gems/inertia-core/spec/scroll_metadata_spec.rb`). The core ships no
+# pagination adapters — they belong to the gems that define the pagination
+# objects — so the Kaminari and Pagy ones and their registration order live here.
 RSpec.describe InertiaRails::ScrollMetadata do
   describe '.extract' do
     context 'with Kaminari adapter' do
@@ -96,254 +100,20 @@ RSpec.describe InertiaRails::ScrollMetadata do
         )
       end
     end
-
-    context 'with Hash adapter' do
-      let(:hash_metadata) do
-        {
-          page_name: 'items',
-          previous_page: 1,
-          next_page: 3,
-          current_page: 2,
-        }
-      end
-
-      it 'extracts metadata from hash' do
-        result = described_class.extract(hash_metadata)
-
-        expect(result).to eq(
-          pageName: 'items',
-          previousPage: 1,
-          nextPage: 3,
-          currentPage: 2
-        )
-      end
-
-      it 'raises error when required keys are missing' do
-        incomplete_hash = { page_name: 'items' }
-
-        expect do
-          described_class.extract(incomplete_hash)
-        end.to raise_error(KeyError)
-      end
-
-      it 'allows options to override hash values' do
-        result = described_class.extract(
-          hash_metadata,
-          page_name: 'overridden',
-          next_page: 5
-        )
-
-        expect(result).to eq(
-          pageName: 'overridden',
-          previousPage: 1,
-          nextPage: 5,
-          currentPage: 2
-        )
-      end
-    end
-
-    context 'with unsupported metadata type' do
-      it 'raises MissingMetadataAdapterError with no options provided' do
-        unsupported_metadata = 'unsupported'
-
-        expect do
-          described_class.extract(unsupported_metadata)
-        end.to raise_error(
-          InertiaRails::ScrollMetadata::MissingMetadataAdapterError,
-          'No ScrollMetadata adapter found for unsupported'
-        )
-      end
-
-      it 'uses options as fallback when no adapter matches' do
-        unsupported_metadata = 'unsupported'
-
-        result = described_class.extract(
-          unsupported_metadata,
-          page_name: 'fallback',
-          previous_page: nil,
-          next_page: nil,
-          current_page: 1
-        )
-
-        expect(result).to eq(
-          pageName: 'fallback',
-          previousPage: nil,
-          nextPage: nil,
-          currentPage: 1
-        )
-      end
-
-      it 'raises error when insufficient options provided for unsupported type' do
-        unsupported_metadata = 'unsupported'
-
-        expect do
-          described_class.extract(unsupported_metadata, page_name: 'fallback')
-        end.to raise_error(
-          InertiaRails::ScrollMetadata::MissingMetadataAdapterError,
-          'No ScrollMetadata adapter found for unsupported'
-        )
-      end
-    end
-
-    context 'with nil metadata' do
-      it 'uses options to create props when all required options provided' do
-        result = described_class.extract(
-          nil,
-          page_name: 'nil_page',
-          previous_page: nil,
-          next_page: 2,
-          current_page: 1
-        )
-
-        expect(result).to eq(
-          pageName: 'nil_page',
-          previousPage: nil,
-          nextPage: 2,
-          currentPage: 1
-        )
-      end
-
-      it 'raises error when insufficient options provided for nil metadata' do
-        expect do
-          described_class.extract(nil, page_name: 'partial')
-        end.to raise_error(
-          InertiaRails::ScrollMetadata::MissingMetadataAdapterError,
-          'No ScrollMetadata adapter found for '
-        )
-      end
-    end
-  end
-
-  describe '.register_adapter' do
-    after do
-      # Reset adapters to original state
-      described_class.adapters = [
-        InertiaRails::ScrollMetadata::KaminariAdapter,
-        InertiaRails::ScrollMetadata::PagyAdapter,
-        InertiaRails::ScrollMetadata::HashAdapter
-      ].map(&:new)
-    end
-
-    it 'registers custom adapter and gives it priority' do
-      custom_adapter_class = Class.new do
-        def match?(metadata)
-          metadata == 'custom'
-        end
-
-        def call(_metadata, **_options)
-          {
-            page_name: 'custom_adapter',
-            previous_page: nil,
-            next_page: nil,
-            current_page: 1,
-          }
-        end
-      end
-
-      described_class.register_adapter(custom_adapter_class)
-
-      result = described_class.extract('custom')
-
-      expect(result).to eq(
-        pageName: 'custom_adapter',
-        previousPage: nil,
-        nextPage: nil,
-        currentPage: 1
-      )
-    end
-
-    it 'gives precedence to most recently registered adapters' do
-      first_adapter = Class.new do
-        def match?(metadata)
-          metadata.is_a?(Hash)
-        end
-
-        def call(_metadata, **_options)
-          {
-            page_name: 'first_adapter',
-            previous_page: nil,
-            next_page: nil,
-            current_page: 1,
-          }
-        end
-      end
-
-      second_adapter = Class.new do
-        def match?(metadata)
-          metadata.is_a?(Hash)
-        end
-
-        def call(_metadata, **_options)
-          {
-            page_name: 'second_adapter',
-            previous_page: nil,
-            next_page: nil,
-            current_page: 1,
-          }
-        end
-      end
-
-      described_class.register_adapter(first_adapter)
-      described_class.register_adapter(second_adapter)
-
-      result = described_class.extract({})
-
-      expect(result[:pageName]).to eq('second_adapter')
-    end
-  end
-
-  describe InertiaRails::ScrollMetadata::Props do
-    describe '#as_json' do
-      it 'converts to proper JSON format' do
-        props = described_class.new(
-          page_name: 'items',
-          previous_page: 1,
-          next_page: 3,
-          current_page: 2
-        )
-
-        result = props.as_json
-
-        expect(result).to eq(
-          pageName: 'items',
-          previousPage: 1,
-          nextPage: 3,
-          currentPage: 2
-        )
-      end
-
-      it 'ignores options parameter' do
-        props = described_class.new(
-          page_name: 'items',
-          previous_page: 1,
-          next_page: 3,
-          current_page: 2
-        )
-
-        result = props.as_json({ some: 'options' })
-
-        expect(result).to eq(
-          pageName: 'items',
-          previousPage: 1,
-          nextPage: 3,
-          currentPage: 2
-        )
-      end
-    end
   end
 
   describe 'adapter precedence' do
     it 'tries adapters in registration order' do
       # Mock all adapters to match
-      allow_any_instance_of(InertiaRails::ScrollMetadata::KaminariAdapter)
+      allow_any_instance_of(InertiaRails::ScrollAdapters::KaminariAdapter)
         .to receive(:match?).and_return(true)
-      allow_any_instance_of(InertiaRails::ScrollMetadata::PagyAdapter)
+      allow_any_instance_of(InertiaRails::ScrollAdapters::PagyAdapter)
         .to receive(:match?).and_return(true)
       allow_any_instance_of(InertiaRails::ScrollMetadata::HashAdapter)
         .to receive(:match?).and_return(true)
 
       # Mock calls to return identifiable results
-      allow_any_instance_of(InertiaRails::ScrollMetadata::KaminariAdapter)
+      allow_any_instance_of(InertiaRails::ScrollAdapters::KaminariAdapter)
         .to receive(:call).and_return({
                                         page_name: 'kaminari',
                                         previous_page: nil,

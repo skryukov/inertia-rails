@@ -5,6 +5,19 @@ module InertiaRails
     thread_mattr_accessor :current_response
     mattr_accessor :evaluate_optional_props, default: false
 
+    # Forces optional and deferred props to resolve on full loads, so specs can assert
+    # their values without a follow-up partial request. The metadata still announces
+    # a first load.
+    module ResolverOptionsTestingPatch
+      private
+
+      def resolver_options
+        return super unless InertiaRails::Testing.evaluate_optional_props
+
+        super.merge(eager: true)
+      end
+    end
+
     module RendererTestingPatch
       def new(component, controller, request, response, render, **options)
         wrapped = TestResponse.new.wrap_render(render)
@@ -13,23 +26,11 @@ module InertiaRails
       end
     end
 
-    module PropsResolverOptionalInTests
-      private
-
-      def keep_prop?(prop, path, parent_was_resolved: false)
-        return true if InertiaRails::Testing.evaluate_optional_props &&
-                       (prop.is_a?(IgnoreOnFirstLoadProp) || prop.try(:deferred?)) &&
-                       !rendering_partial_component?
-
-        super
-      end
-    end
-
     def self.install!
       return if @installed
 
       InertiaRails::Renderer.singleton_class.prepend(RendererTestingPatch)
-      InertiaRails::PropsResolver.prepend(PropsResolverOptionalInTests)
+      InertiaRails::Renderer.prepend(ResolverOptionsTestingPatch)
       @installed = true
     end
 

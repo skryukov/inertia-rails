@@ -35,6 +35,14 @@ jobs:
           bundler-cache: true
           ruby-version: '4.0'
 
+      # inertia_rails depends on the exact inertia-core version, so the core
+      # has to exist on rubygems.org before the adapter is pushed.
+      - name: Publish inertia-core to RubyGems
+        uses: rubygems/release-gem@1c162a739e8b4cb21a676e97b087e8268d8fc40b # v1.1.2
+        with:
+          await-release: false
+          working-directory: gems/inertia-core
+
       - name: Publish to RubyGems
         uses: rubygems/release-gem@1c162a739e8b4cb21a676e97b087e8268d8fc40b # v1.1.2
 

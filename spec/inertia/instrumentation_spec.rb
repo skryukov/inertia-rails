@@ -51,6 +51,24 @@ RSpec.describe 'inertia instrumentation', type: :request do
     end
   end
 
+  describe 'cache_fetch.inertia_rails' do
+    let(:cache_store) { ActiveSupport::Cache::MemoryStore.new }
+
+    before { allow(InertiaRails).to receive(:cache_store).and_return(cache_store) }
+
+    it 'instruments each cached prop fetch with its key and hit state' do
+      events = collect_events('cache_fetch.inertia_rails') do
+        get cached_props_path
+        get cached_props_path
+      end
+
+      expect(events.map(&:payload)).to eq([
+                                            { key: 'inertia_rails_v2/stats_key', hit: false },
+                                            { key: 'inertia_rails_v2/stats_key', hit: true }
+                                          ])
+    end
+  end
+
   describe 'ssr.inertia_rails' do
     with_inertia_config ssr_enabled: true, ssr_url: 'http://localhost:13714', version: '1.0'
 

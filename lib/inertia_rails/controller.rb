@@ -22,7 +22,7 @@ module InertiaRails
         next unless request.format.html? || request.xhr?
         next if XsrfCookieRefreshPolicy.skip?(self)
 
-        cookies['XSRF-TOKEN'] = form_authenticity_token
+        cookies[Inertia::Core::XsrfCookie::COOKIE] = form_authenticity_token
       end
 
       rescue_from InertiaRails::PrecognitionResponse do |e|
@@ -34,15 +34,25 @@ module InertiaRails
       def inertia_share(hash = nil, **props, &block)
         options = props.slice(:if, :unless, :only, :except)
         data = hash || props.except(:if, :unless, :only, :except)
+        # The share site, for the DevTools editor link.
+        source = InertiaRails::Devtools::SourceLocator.caller_source(caller_locations(1, 30))
 
         before_action(**options) do
           @_inertia_shared ||= []
           @_inertia_shared << data.freeze if data.any?
           @_inertia_shared << block if block
+
+          InertiaRails::Devtools.recorder(request)&.share_source(data.keys, source) if data.any?
         end
       end
 
       def inertia_config(**attrs)
+        global = attrs.keys & Configuration::GLOBAL_OPTION_NAMES
+        if global.any?
+          raise ArgumentError,
+                "#{global.join(', ')} cannot be set per controller — set them via InertiaRails.configure instead."
+        end
+
         config = InertiaRails::Configuration.new(**attrs)
 
         if @inertia_config
@@ -72,6 +82,10 @@ module InertiaRails
       @_inertia_shared ||= []
       @_inertia_shared << props.freeze unless props.empty?
       @_inertia_shared << block if block
+
+      if (recorder = InertiaRails::Devtools.recorder(request))
+        recorder.share_source(props.keys, InertiaRails::Devtools::SourceLocator.caller_source)
+      end
     end
 
     def default_render
@@ -110,13 +124,13 @@ module InertiaRails
     end
 
     def render_precognition(errors)
-      response.headers['Precognition'] = 'true'
+      precognition = Inertia::Core::Precognition
+      response.headers.merge!(precognition.headers(errors))
 
-      if errors.empty?
-        response.headers['Precognition-Success'] = 'true'
-        head :no_content
+      if (body = precognition.body(errors))
+        render json: body, status: precognition.status(errors)
       else
-        render json: { errors: errors }, status: :unprocessable_entity
+        head precognition.status(errors)
       end
     end
 
@@ -163,11 +177,15 @@ module InertiaRails
           {}
         end
 
+      recorder = InertiaRails::Devtools.recorder(request)
+
       (@_inertia_shared || []).filter_map do |shared_data|
-        if shared_data.respond_to?(:call)
-          instance_exec(&shared_data)
-        else
-          shared_data
+        next shared_data unless shared_data.respond_to?(:call)
+
+        instance_exec(&shared_data).tap do |result|
+          next unless recorder && result.respond_to?(:keys)
+
+          recorder.share_source(result.keys, InertiaRails::Devtools::SourceLocator.block_source(shared_data))
         end
       end.reduce(initial_data, &:merge)
     end

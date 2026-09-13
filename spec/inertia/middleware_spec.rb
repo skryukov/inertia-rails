@@ -11,6 +11,32 @@ RSpec.describe 'InertiaRails::Middleware', type: :request do
       expect(response.headers['X-Inertia-Location']).to eq request.original_url
     end
 
+    it 'sends a stale client behind a proxy back to the URL it reached' do
+      get empty_test_path, headers: { 'X-Inertia' => true, 'X-Inertia-Version' => 'stale',
+                                      'HTTP_X_FORWARDED_PROTO' => 'https',
+                                      'HTTP_X_FORWARDED_HOST' => 'app.example.com:8443', }
+
+      expect(response.status).to eq 409
+      expect(response.headers['X-Inertia-Location']).to eq 'https://app.example.com:8443/empty_test'
+    end
+
+    it 'brackets an IPv6 host when sending a stale client back' do
+      get empty_test_path, headers: { 'X-Inertia' => true, 'X-Inertia-Version' => 'stale',
+                                      'HTTP_HOST' => '[::1]:3000', }
+
+      expect(response.headers['X-Inertia-Location']).to eq 'http://[::1]:3000/empty_test'
+    end
+
+    it 'keeps the headers the app set on the forced refresh' do
+      get render_with_cookie_test_path, headers: { 'X-Inertia' => true, 'X-Inertia-Version' => 'stale' }
+
+      expect(response.status).to eq 409
+      expect(response.headers['X-Inertia-Location']).to eq request.original_url
+      expect(response.headers['X-App-Header']).to eq 'kept'
+      expect(cookies['app_cookie']).to eq 'hello'
+      expect(response.headers['X-Inertia-Version']).to eq '1.0'
+    end
+
     it 'returns page when version is up to date' do
       get empty_test_path, headers: { 'X-Inertia' => true, 'X-Inertia-Version' => '1.0' }
 
@@ -61,6 +87,19 @@ RSpec.describe 'InertiaRails::Middleware', type: :request do
       get empty_test_path
       expect(request.session.loaded?).to be(true)
       expect(session[:inertia_errors]).to be_nil
+    end
+
+    # Rails 6.1 hands a bare env without a session middleware a plain Hash,
+    # which has no `loaded?` to ask.
+    it 'leaves a session that cannot say whether it was loaded alone' do
+      app = ->(_env) { [200, { 'content-type' => 'text/plain' }, ['ok']] }
+      session = { inertia_errors: { name: 'taken' } }
+      env = Rack::MockRequest.env_for('http://www.example.com/articles', 'rack.session' => session)
+
+      status, = InertiaRails::Middleware.new(app).call(env)
+
+      expect(status).to eq 200
+      expect(session).to eq(inertia_errors: { name: 'taken' })
     end
   end
 
@@ -217,6 +256,50 @@ RSpec.describe 'InertiaRails::Middleware', type: :request do
         end
       end
 
+      # An app behind a proxy builds its absolute URLs from the origin the client
+      # reached, so the middleware has to read that origin the same way or every
+      # redirect of the app's own becomes a full page visit.
+      context 'behind a proxy' do
+        {
+          'TLS terminated upstream' => [{ 'HTTP_X_FORWARDED_PROTO' => 'https' },
+                                        'https://www.example.com/empty_test'],
+          'a proxy chain, the client at the front' => [{ 'HTTP_X_FORWARDED_PROTO' => 'https, http' },
+                                                       'https://www.example.com/empty_test'],
+          'a rewritten host' => [{ 'HTTP_X_FORWARDED_HOST' => 'app.example.com' },
+                                 'http://app.example.com/empty_test'],
+          'a rewritten host carrying a port' => [{ 'HTTP_X_FORWARDED_HOST' => 'app.example.com:8443' },
+                                                 'http://app.example.com:8443/empty_test'],
+          'a forwarded port' => [{ 'HTTP_X_FORWARDED_PORT' => '8443' },
+                                 'http://www.example.com:8443/empty_test'],
+          'an app port the client never sees' => [{ 'SERVER_PORT' => '3000' },
+                                                  'http://www.example.com/empty_test'],
+          'an IPv6 authority' => [{ 'HTTP_HOST' => '[::1]:3000' }, 'http://[::1]:3000/empty_test'],
+        }.each do |description, (env, location)|
+          it "does not convert a same-origin redirect with #{description}" do
+            get location_header_test_path(url: location), headers: { 'X-Inertia' => true }.merge(env)
+
+            expect(response.status).to eq 302
+            expect(response.headers['X-Inertia-Location']).to be_nil
+          end
+        end
+
+        it 'does not convert a same-origin redirect the app built from the forwarded headers' do
+          get same_origin_redirect_test_path,
+              headers: { 'X-Inertia' => true, 'HTTP_X_FORWARDED_HOST' => 'app.example.com' }
+
+          expect(response.status).to eq 302
+          expect(response.headers['Location']).to eq 'http://app.example.com/empty_test'
+        end
+
+        it 'still converts a genuinely external redirect' do
+          get location_header_test_path(url: 'https://external-website.com/some_path'),
+              headers: { 'X-Inertia' => true, 'HTTP_X_FORWARDED_PROTO' => 'https' }
+
+          expect(response.status).to eq 409
+          expect(response.headers['X-Inertia-Location']).to eq 'https://external-website.com/some_path'
+        end
+      end
+
       context 'when the asset version is stale' do
         with_inertia_config version: '1.0'
 
@@ -225,6 +308,7 @@ RSpec.describe 'InertiaRails::Middleware', type: :request do
 
           expect(response.status).to eq 409
           expect(response.headers['X-Inertia-Location']).to eq 'http://external-website.com/some_path'
+          expect(response.headers['X-Inertia-Version']).to eq '1.0'
         end
       end
 
@@ -322,8 +406,10 @@ RSpec.describe 'InertiaRails::Middleware', type: :request do
       status, response_headers, response_body = InertiaRails::Middleware.new(app).call(env)
 
       expect(status).to eq 409
-      expect(response_headers).to eq('X-Inertia-Location' => 'http://external-website.com/some_path',
-                                     'Set-Cookie' => 'key=value')
+      # Rack 3 wants lowercase response header names, Rack 2 takes them as
+      # written, so the name the middleware wrote is compared case-blind.
+      expect(response_headers.transform_keys(&:downcase))
+        .to eq('x-inertia-location' => 'http://external-website.com/some_path', 'set-cookie' => 'key=value')
       expect(response_body).to eq []
       expect(body.closed?).to be true
     end

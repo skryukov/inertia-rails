@@ -1383,6 +1383,9 @@ class UsersController < ApplicationController
 end
 ```
 
+> [!NOTE]
+> The built-in adapters declare the override names they accept (`page_name`, `previous_page`, `next_page`, `current_page`), so a misspelled override raises instead of vanishing. A custom adapter stays open — it receives every unrecognized option untouched — unless it declares its own names with an `accepted_options` method returning an array of symbols.
+
 ### Wrapper Option
 
 The `wrapper` option allows you to specify a custom key for nested data structures. This is useful when your data is wrapped in an object with metadata:
@@ -1405,3 +1408,23 @@ end
 ```
 
 This example demonstrates how the `wrapper` option works with nested data structures, ensuring that only the `items` array gets merged during infinite scrolling while preserving the `metadata` object.
+
+### Holding Back the First Page
+
+@available_since rails=master
+
+Pass `optional: true` to keep the first page off the initial response entirely — the prop is only produced once a [partial reload](/guide/partial-reloads) asks for it by name. Use `defer: true` instead to have Inertia fetch it automatically right after the page loads.
+
+```ruby
+class UsersController < ApplicationController
+  def index
+    users = User.page(params[:page])
+
+    render inertia: {
+      users: InertiaRails.scroll(users, optional: true) { users.as_json(...) },
+    }
+  end
+end
+```
+
+Either way the pagination metadata travels with the prop, so it reaches the client on the request that carries the first page rather than on the initial load.

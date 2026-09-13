@@ -11,11 +11,11 @@ module InertiaRails
     end
 
     def inertia_precognitive?
-      headers['Precognition'] == 'true'
+      Inertia::Core::Precognition.request?(env)
     end
 
     def inertia_precognitive_validate_only
-      headers['Precognition-Validate-Only']&.split(',')&.map(&:strip)
+      Inertia::Core::Precognition.validate_only(env)
     end
   end
 end

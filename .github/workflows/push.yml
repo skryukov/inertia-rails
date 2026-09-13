@@ -29,6 +29,30 @@ jobs:
       - name: Run RuboCop
         run: bundle exec rubocop
 
+  core:
+    strategy:
+      fail-fast: false
+      matrix:
+        ruby: ['3.0', '3.4']
+    runs-on: ubuntu-latest
+    name: inertia-core on Ruby ${{ matrix.ruby }}
+    steps:
+      - uses: actions/checkout@v6
+      - name: Set up Ruby
+        uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: ${{ matrix.ruby }}
+          bundler-cache: true
+          working-directory: gems/inertia-core
+      - name: Run RSpec
+        run: bundle exec rspec
+        working-directory: gems/inertia-core
+      # A pass of its own: these mount real web frameworks, and with them Rack,
+      # whose presence the middleware reads.
+      - name: Run the host matrix (Sinatra, Hanami)
+        run: bundle exec rspec spec/hosts
+        working-directory: gems/inertia-core
+
   test:
     strategy:
       fail-fast: false

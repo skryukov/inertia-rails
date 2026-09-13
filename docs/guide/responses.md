@@ -56,6 +56,42 @@ inertia_config(
 )
 ```
 
+### Serializing Props
+
+@available_since rails=3.19.0
+
+Any object that responds to `to_inertia` is serialized by calling that method and using its return value as the prop. This lets you move serialization into a dedicated object:
+
+```ruby
+class UserSerializer
+  def initialize(user)
+    @user = user
+  end
+
+  def to_inertia
+    { id: @user.id, name: @user.name, admin: @user.admin? }
+  end
+end
+
+render inertia: 'users/show', props: { user: UserSerializer.new(user) }
+```
+
+The return value is resolved like any other prop, so it can contain prop types such as [`optional`](/guide/partial-reloads#lazy-data-evaluation), [`defer`](/guide/deferred-props), and [`merge`](/guide/merging-props) for per-attribute control.
+
+@available_since rails=master
+
+The protocol also applies to array elements, and `ActiveRecord::Relation` implements it as `to_a`, so a record's `to_inertia` fires inside `users: User.all` exactly as it does inside a plain array. Records without `to_inertia` serialize through `as_json`, unchanged.
+
+```ruby
+class User < ApplicationRecord
+  def to_inertia
+    { id: id, name: name }
+  end
+end
+
+render inertia: 'users/index', props: { users: User.all }
+```
+
 ### Using Instance Variables as Props
 
 For convenience, Inertia can automatically pass your controller's instance variables to the page component as props. To enable this behavior, invoke the `use_inertia_instance_props` method within your controller or a base controller.
@@ -86,6 +122,10 @@ Please note that if you manually provide a props hash in your render call, the i
 > - Variables intended only for server-side logic.
 >
 > This creates a high risk of accidentally leaking sensitive data or internal implementation details to the client. It can also negatively impact performance by serializing unnecessary heavy objects. We recommend being explicit with your props whenever possible.
+
+## Serializing Props
+
+Props are encoded as JSON before they reach the page. Rails' `as_json`, the `to_inertia` protocol, and serializer libraries like [`alba-inertia`](https://github.com/skryukov/alba-inertia) each give you a different level of control. See the [Serialization guide](/guide/serialization) for the full picture — including per-attribute prop types, shared props, and [key casing](/guide/serialization#key-casing).
 
 ## Root Template Data
 

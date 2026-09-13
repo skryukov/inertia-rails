@@ -1,0 +1,7 @@
+--format documentation
+--color
+--require spec_helper
+# The unit suite is the top level of spec/. spec/hosts mounts real web
+# frameworks, and with them Rack, whose presence `Inertia::Core::Rack.header_name`
+# reads — so the matrix is a pass of its own: `bundle exec rspec spec/hosts`.
+--exclude-pattern hosts/**/*_spec.rb

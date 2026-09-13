@@ -41,7 +41,7 @@ Pass an Active Record object to derive the key from `cache_key_with_version`. Th
 
 ```ruby
 InertiaRails.cache(@post) { PostSerializer.render(@post) }
-# Cache key: "inertia_rails/posts/1-20260410120000"
+# Cache key: "inertia_rails_v2/posts/1-20260410120000"
 ```
 
 ### Array Keys
@@ -50,7 +50,7 @@ Pass an array to build a composite key:
 
 ```ruby
 InertiaRails.cache(['stats', current_user.id]) { Stats.for(current_user) }
-# Cache key: "inertia_rails/stats/42"
+# Cache key: "inertia_rails_v2/stats/42"
 ```
 
 ## Cache Options
@@ -65,7 +65,7 @@ InertiaRails.cache('stats', expires_in: 1.hour, race_condition_ttl: 10.seconds) 
 
 ## Combining with Other Prop Types
 
-The `cache` option can be passed to [deferred](/guide/deferred-props) and [optional](/guide/partial-reloads#lazy-data-evaluation) props:
+The `cache` option can be passed to [deferred](/guide/deferred-props), [optional](/guide/partial-reloads#lazy-data-evaluation), [once](/guide/once-props), [merge](/guide/merging-props), and always props:
 
 ```ruby
 class DashboardController < ApplicationController
@@ -76,6 +76,9 @@ class DashboardController < ApplicationController
 
       # Optional prop with caching
       categories: InertiaRails.optional(cache: @team) { @team.categories },
+
+      # Once prop with caching
+      countries: InertiaRails.once(cache: 'countries') { Country.all },
     }
   end
 end
@@ -87,8 +90,24 @@ The `cache` option accepts the same key formats as `InertiaRails.cache`: strings
 InertiaRails.defer(cache: { key: 'feed', expires_in: 5.minutes }) { current_user.feed }
 ```
 
+> [!WARNING]
+> Don't return prop types like `defer` or `optional` from a cached block, even nested inside a hash or array. The cache stores the value once and replays it for every request, but prop types do per-request work: they check what the visit asks for and write entries into the page metadata. Replayed JSON can do neither, so Inertia raises. Cache through the prop type's `cache:` option instead:
+>
+> ```ruby
+> # Raises — the deferred prop can never be resolved from the cached JSON
+> InertiaRails.cache('dashboard') { { totals: Stats.totals, feed: InertiaRails.defer { current_user.feed } } }
+>
+> # Works — each prop type caches its own value
+> InertiaRails.cache('totals') { Stats.totals }
+> InertiaRails.defer(cache: 'feed') { current_user.feed }
+> ```
+>
+> The mirror rule applies to every prop type's block: it may not return any prop type — `InertiaRails.cache` included. Combine prop types as options instead (`defer(once: true)`), and cache with the `cache:` option (`once(cache: 'countries')`).
+
+Objects responding to [`to_inertia`](/guide/serialization#the-to-inertia-protocol) are resolved before the value is cached, so serializers work inside a cached block.
+
 ## Cache Store
 
-By default, Inertia uses `Rails.cache`. You can configure a different store via the [`cache_store`](/guide/configuration#cache_store) option. All cached prop keys are automatically prefixed with `inertia_rails/` to avoid collisions.
+By default, Inertia uses `Rails.cache`. You can configure a different store via the [`cache_store`](/guide/configuration#cache_store) option. All cached prop keys are automatically prefixed with `inertia_rails_v2/` to avoid collisions. The `v2` marks the serialized format, which changed when serializers started resolving inside cached blocks. Entries written under the old `inertia_rails/` prefix are never read again, but they are not deleted either — they stay until their expiry passes or your cache store evicts them.
 
 For more information on configuring cache stores, cache key strategies, and expiration policies, see the [Rails low-level caching guide](https://guides.rubyonrails.org/caching_with_rails.html#low-level-caching-using-rails-cache).

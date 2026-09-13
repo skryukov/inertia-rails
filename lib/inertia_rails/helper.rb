@@ -21,15 +21,18 @@ module InertiaRails
       controller.instance_variable_get('@_inertia_page')
     end
 
+    # Under `server_head` the prop holds the markup the render printed, so it
+    # is trusted; any other string is escaped like any view value.
     def inertia_meta_tags
       config = controller.send(:inertia_configuration)
       meta_tag_data = (inertia_page || {}).dig(:props, config.meta_prop) || []
-      attribute = config.head_attribute
 
-      meta_tags = meta_tag_data.map do |inertia_meta_tag|
-        next inertia_meta_tag if inertia_meta_tag.is_a?(String)
-
-        inertia_meta_tag.to_tag(tag, inertia_attribute: attribute)
+      meta_tags = meta_tag_data.map do |meta_tag|
+        if meta_tag.is_a?(String)
+          config.server_head ? meta_tag.html_safe : meta_tag
+        else
+          meta_tag.to_html(inertia_attribute: config.head_attribute).html_safe
+        end
       end
 
       safe_join(meta_tags, "\n")
@@ -37,22 +40,11 @@ module InertiaRails
 
     def inertia_root(id: nil, page: inertia_page)
       config = controller.send(:inertia_configuration)
-      id ||= config.root_dom_id
+      nonce = content_security_policy_nonce if respond_to?(:content_security_policy_nonce, true)
 
-      if config.use_script_element_for_initial_page
-        script_options = { 'data-page': id, type: 'application/json' }
-        if respond_to?(:content_security_policy_nonce, true)
-          nonce = content_security_policy_nonce
-          script_options[:nonce] = nonce if nonce.present?
-        end
-
-        safe_join([
-                    tag.script(page.to_json.html_safe, **script_options),
-                    tag.div(id: id)
-                  ], "\n")
-      else
-        tag.div(id: id, 'data-page': page.to_json)
-      end
+      Inertia::Core::Protocol.root_element(
+        page, id: id || config.root_dom_id, script: config.use_script_element_for_initial_page, nonce: nonce.presence
+      ).html_safe
     end
   end
 end

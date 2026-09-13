@@ -5,6 +5,9 @@ source 'https://rubygems.org'
 # Specify your gem's dependencies in inertia_rails.gemspec
 gemspec
 
+# The framework-agnostic core, released in lockstep from this repository.
+gem 'inertia-core', path: 'gems/inertia-core'
+
 version = ENV.fetch('RAILS_VERSION', '8.1')
 gem 'rails', "~> #{version}.0"
 
@@ -17,7 +20,7 @@ gem 'rake', '~> 13.0'
 gem 'responders'
 gem 'rspec-rails', '~> 6.0'
 gem 'rubocop', '~> 1.21'
-gem 'sqlite3'
+gem 'sqlite3', version.to_f < 7.1 ? '~> 1.4' : '>= 2.0'
 
 gem 'kaminari'
 gem 'pagy'
