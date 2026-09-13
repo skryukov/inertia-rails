@@ -1004,6 +1004,28 @@ RSpec.describe InertiaRails::PropsResolver do
       expect(page[:scrollProps]).to eq('feed.posts' => { pageName: 'page', previousPage: nil, nextPage: 2,
                                                          currentPage: 1, reset: false, })
     end
+
+    # An optional scroll prop is not delivered on the initial load, so there is
+    # nothing for the client to paginate yet — same rule as a deferred one.
+    it 'omits an optional scroll prop and its metadata on the initial load' do
+      props = { posts: InertiaRails::ScrollProp.new(metadata: scroll_metadata, optional: true) { [{ id: 1 }] } }
+      resolver = described_class.new(props, evaluator: scroll_evaluator)
+      resolved_props, metadata = resolver.resolve
+
+      expect(resolved_props).not_to have_key(:posts)
+      expect(metadata).not_to have_key(:scrollProps)
+    end
+
+    it 'includes an optional scroll prop with metadata on a partial request' do
+      props = { posts: InertiaRails::ScrollProp.new(metadata: scroll_metadata, optional: true) { [{ id: 1 }] } }
+      resolver = described_class.new(props, evaluator: scroll_evaluator,
+                                            visit: { component: true, only: ['posts'] })
+      resolved_props, metadata = resolver.resolve
+
+      expect(resolved_props[:posts]).to eq([{ id: 1 }])
+      expect(metadata[:scrollProps]).to eq('posts' => { pageName: 'page', previousPage: nil, nextPage: 2,
+                                                        currentPage: 1, reset: false, })
+    end
   end
 
   describe 'to_inertia protocol' do

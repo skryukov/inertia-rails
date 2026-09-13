@@ -167,6 +167,39 @@ RSpec.describe InertiaRails::ScrollProp do
     end
   end
 
+  describe '#optional?' do
+    it 'defaults to false' do
+      expect(described_class.new { %w[item1] }.optional?).to be false
+    end
+
+    it 'returns true when optional: true' do
+      expect(described_class.new(optional: true) { %w[item1] }.optional?).to be true
+    end
+
+    it 'does not leak optional into metadata options' do
+      captured = nil
+      capturing_adapter = Class.new do
+        def match?(metadata) = metadata == :capture
+
+        define_method(:call) do |_metadata, **options|
+          captured = options
+          { page_name: 'page', previous_page: nil, next_page: 2, current_page: 1 }
+        end
+      end
+      InertiaRails::ScrollMetadata.register_adapter(capturing_adapter)
+
+      described_class.new(metadata: :capture, optional: true, page_size: 20) { %w[item1] }.metadata
+
+      expect(captured).to eq(page_size: 20)
+    ensure
+      InertiaRails::ScrollMetadata.adapters = [
+        InertiaRails::ScrollMetadata::KaminariAdapter,
+        InertiaRails::ScrollMetadata::PagyAdapter,
+        InertiaRails::ScrollMetadata::HashAdapter
+      ].map(&:new)
+    end
+  end
+
   describe 'edge cases' do
     let(:headers) { {} }
     let(:controller) do

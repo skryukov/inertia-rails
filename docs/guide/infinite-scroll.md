@@ -1405,3 +1405,23 @@ end
 ```
 
 This example demonstrates how the `wrapper` option works with nested data structures, ensuring that only the `items` array gets merged during infinite scrolling while preserving the `metadata` object.
+
+### Holding Back the First Page
+
+@available_since rails=master
+
+Pass `optional: true` to keep the first page off the initial response entirely — the prop is only produced once a [partial reload](/guide/partial-reloads) asks for it by name. Use `defer: true` instead to have Inertia fetch it automatically right after the page loads.
+
+```ruby
+class UsersController < ApplicationController
+  def index
+    users = User.page(params[:page])
+
+    render inertia: {
+      users: InertiaRails.scroll(users, optional: true) { users.as_json(...) },
+    }
+  end
+end
+```
+
+Either way the pagination metadata travels with the prop, so it reaches the client on the request that carries the first page rather than on the initial load.

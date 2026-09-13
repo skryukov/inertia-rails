@@ -197,7 +197,9 @@ module InertiaRails
 
       resetting = reset_keys.include?(path)
 
-      if prop.is_a?(ScrollProp) && (rendering_partial_component? || !prop.deferred?)
+      # A scroll prop held back on the first load has nothing for the client to
+      # paginate yet, so its pagination metadata waits for the partial reload.
+      if prop.is_a?(ScrollProp) && (rendering_partial_component? || !(prop.deferred? || prop.optional?))
         @_scroll[path] = prop.metadata.merge(reset: resetting)
       end
 
@@ -235,9 +237,13 @@ module InertiaRails
       return false if !parent_was_resolved && excluded_by_partial_request?(path)
 
       # Precedence: Evaluate IgnoreOnFirstLoadProp only after partial keys have been checked
-      return false if (prop.is_a?(IgnoreOnFirstLoadProp) || prop.try(:deferred?)) && !rendering_partial_component?
+      return false if held_back_on_first_load?(prop) && !rendering_partial_component?
 
       true
+    end
+
+    def held_back_on_first_load?(prop)
+      prop.is_a?(IgnoreOnFirstLoadProp) || prop.try(:deferred?) || prop.try(:optional?)
     end
 
     def excluded_by_once_cache?(prop, path)

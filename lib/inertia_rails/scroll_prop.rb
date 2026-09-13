@@ -11,15 +11,22 @@ module InertiaRails
 
       @merge = true
       @deferred = options.delete(:defer) || false
+      @optional = options.delete(:optional) || false
       @group = options.delete(:group) || DeferProp::DEFAULT_GROUP
       @metadata = options.delete(:metadata)
       @wrapper = options.delete(:wrapper)
 
+      # Whatever is left belongs to the pagination adapter, which knows its own
+      # vocabulary.
       @options = options
     end
 
     def deferred?
       @deferred
+    end
+
+    def optional?
+      @optional
     end
 
     def call(controller, scroll_intent: nil, **)
