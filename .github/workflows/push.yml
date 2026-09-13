@@ -81,6 +81,11 @@ jobs:
       - name: Run the core suite without Rails
         run: bundle exec rspec -O spec/core/.rspec spec/core
 
+      # A pass of its own: these mount real web frameworks, and with them Rack,
+      # whose presence the middleware reads.
+      - name: Run the host matrix (Sinatra, Hanami)
+        run: bundle exec rspec -O spec/core/.rspec spec/core/hosts
+
       - name: Run Minitest
         run: bundle exec rake test
         env:

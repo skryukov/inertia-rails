@@ -102,6 +102,13 @@ class Dashboard < Sinatra::Base
 end
 ```
 
+That Sinatra app, and the same page mounted on a Hanami router, are kept as
+running code in [`spec/core/hosts`](../../../spec/core/hosts): they are the
+reference adapters, held to one set of expectations
+(`spec/core/hosts/support/inertia_host_examples.rb`). They mount real web
+frameworks, so they run as a pass of their own:
+`rspec -O spec/core/.rspec spec/core/hosts`.
+
 `Response.new(component, props, env:, configuration:, evaluator:, **page)` —
 `props` values may be plain data, closures, serializers (`to_inertia` /
 `as_json`), or prop types; merge shared props in first with

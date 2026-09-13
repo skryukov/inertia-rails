@@ -21,3 +21,10 @@ gem 'sqlite3', version.to_f < 7.1 ? '~> 1.4' : '>= 2.0'
 
 gem 'kaminari'
 gem 'pagy'
+
+# The host matrix (spec/core/hosts): the real non-Rails apps the core is mounted
+# in. Only a floor is named, so every Ruby/Rails pair resolves a set that agrees
+# on one Rack — the older ones land on Sinatra 3 over Rack 2, the newer on Rack 3.
+gem 'hanami-router', '>= 2.0'
+gem 'rack-test', '>= 2.0'
+gem 'sinatra', '>= 3.0'
