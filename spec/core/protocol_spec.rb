@@ -24,6 +24,34 @@ RSpec.describe Inertia::Core::Protocol do
     end
   end
 
+  describe '.root_element' do
+    let(:page) { { component: 'A', props: { html: '</script><b>' } } }
+
+    it 'embeds the page in a script element beside an empty root, carrying the nonce' do
+      html = described_class.root_element(page, id: 'app', script: true, nonce: 'n"1')
+
+      expect(html).to start_with('<script data-page="app" type="application/json" nonce="n&quot;1">')
+      expect(html).to end_with(%(</script>\n<div id="app"></div>))
+      expect(html).to include(described_class.script_json(page.to_json))
+      expect(html).not_to include('</script><b>')
+    end
+
+    it 'puts the page in the root element itself otherwise, escaped for an attribute' do
+      html = described_class.root_element(page, id: 'app')
+
+      expect(html).to eq(%(<div id="app" data-page="#{CGI.escapeHTML(page.to_json)}"></div>))
+      expect(html).not_to include('<script')
+    end
+
+    it 'escapes the id and leaves the nonce out when there is none' do
+      html = described_class.root_element(page, id: 'a"b', script: true)
+
+      expect(html).to start_with('<script data-page="a&quot;b" type="application/json">')
+      expect(html).not_to include('nonce')
+      expect(html).to end_with('<div id="a&quot;b"></div>')
+    end
+  end
+
   describe '.location_response' do
     it 'is a bodiless 409 pointing at the URL, with the version when known' do
       expect(described_class.location_response('http://x/a?b=1', version: 3))

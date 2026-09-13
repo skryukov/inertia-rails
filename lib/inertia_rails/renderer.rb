@@ -1,6 +1,9 @@
 # frozen_string_literal: true
 
 module InertiaRails
+  # What only Rails knows about a render — shared data, view assigns, the
+  # session's history flags, the flash, the layout, the meta DSL — handed to
+  # the core's Response, whose answer Rails' `render` writes out.
   class Renderer
     %i[component configuration controller props view_data encrypt_history
        clear_history].each do |method_name|
@@ -46,39 +49,52 @@ module InertiaRails
 
     def render
       ActiveSupport::Notifications.instrument('render.inertia_rails',
-                                              component: @component, partial: partial_reload?, ssr: false) do |payload|
-        @response.headers['Vary'] = Inertia::Core::Protocol.vary(@response.headers['Vary'])
-        if @request.inertia?
-          @response.set_header(Inertia::Core::Protocol::HEADER, 'true')
-          @render_method.call json: page.to_json, status: @response.status, content_type: Mime[:json]
+                                              component: @component, partial: inertia.partial?, ssr: false) do |payload|
+        @response.headers.merge!(inertia.headers(@response.headers['Vary']))
+        if inertia.json?
+          @render_method.call json: inertia.json, status: @response.status, content_type: Mime[:json]
+        elsif inertia.ssr?
+          payload[:ssr] = true
+          @controller.instance_variable_set('@_inertia_ssr_head', inertia.head.html_safe)
+          @render_method.call(html: inertia.html.html_safe, layout: layout, locals: locals, formats: :html)
         else
-          ssr = @configuration.ssr_enabled && ssr_render
-          if ssr
-            payload[:ssr] = true
-            @controller.instance_variable_set('@_inertia_ssr_head', ssr['head'].join.html_safe)
-            @render_method.call(
-              html: ssr['body'].html_safe,
-              layout: layout,
-              locals: @view_data.merge(page: page),
-              formats: :html
-            )
-          else
-            @controller.instance_variable_set('@_inertia_page', page)
-            @render_method.call(
-              template: 'inertia',
-              layout: layout,
-              locals: @view_data.merge(page: page),
-              formats: :html
-            )
-          end
+          @controller.instance_variable_set('@_inertia_page', page)
+          @render_method.call(template: 'inertia', layout: layout, locals: locals, formats: :html)
         end
       end
     end
 
     private
 
-    def ssr_render
-      Inertia::Core::SSR::Client.new(@configuration, page: page, host: @host, cache: @ssr_cache).render
+    def inertia
+      @inertia ||= Inertia::Core::Response.new(
+        @component, @props,
+        env: @request.env,
+        configuration: @configuration,
+        evaluator: Inertia::Core::PropEvaluator.new(@controller, host: @host),
+        url: @request.original_fullpath,
+        head: @controller.inertia_meta,
+        flash: @controller.__send__(:inertia_collect_flash_data),
+        shared_keys: @shared_keys,
+        encrypt_history: @encrypt_history,
+        clear_history: @clear_history,
+        preserve_fragment: @preserve_fragment,
+        ssr_cache: @ssr_cache,
+        **resolver_options
+      )
+    end
+
+    def page
+      inertia.page
+    end
+
+    def locals
+      @view_data.merge(page: page)
+    end
+
+    # The adapter's say over resolution: the testing helpers turn on `eager:` here.
+    def resolver_options
+      {}
     end
 
     def layout
@@ -94,108 +110,12 @@ module InertiaRails
       shared_props.keys.map { |key| key.to_s.split('.', 2).first }.uniq
     end
 
-    def page
-      return @page if defined?(@page)
-
-      @page = ActiveSupport::Notifications.instrument('resolve_props.inertia_rails',
-                                                      component: @component, partial: partial_reload?) do
-        build_page
-      end
-    end
-
-    def partial_reload?
-      visit.partial?
-    end
-
-    def visit
-      @visit ||= Inertia::Core::Visit.from_headers(@request.headers, component: @component)
-    end
-
-    # The adapter's say over resolution: the testing helpers turn on `eager:` here.
-    def resolver_options
-      {}
-    end
-
-    def build_page
-      wrap_errors_prop!(@props)
-      validate_meta_prop!
-
-      resolver = Inertia::Core::PropsResolver.new(
-        @props,
-        evaluator: Inertia::Core::PropEvaluator.new(@controller, host: @host),
-        visit: visit,
-        **resolver_options
-      )
-      resolved_props, metadata = resolver.resolve
-
-      resolved_props = @configuration.prop_transformer(props: resolved_props)
-
-      # Add meta tags (never transformed by prop_transformer)
-      merge_meta_tags!(resolved_props)
-
-      Inertia::Core::Page.new(
-        component: @component,
-        props: resolved_props,
-        url: @request.original_fullpath,
-        version: @configuration.version,
-        encrypt_history: @encrypt_history,
-        clear_history: @clear_history,
-        flash: @controller.__send__(:inertia_collect_flash_data),
-        shared_keys: @shared_keys,
-        preserve_fragment: @preserve_fragment,
-        metadata: metadata
-      ).to_h
-    end
-
     def resolve_component(component)
       if component == true || component.is_a?(Hash)
         @configuration.component_path_resolver(path: @controller.controller_path, action: @controller.action_name)
       else
         component
       end
-    end
-
-    def meta_tags
-      @controller.inertia_meta.meta_tags
-    end
-
-    def apply_title_template
-      return unless (template = @configuration.meta_title_template)
-
-      meta = @controller.inertia_meta
-      title = @controller.instance_exec(meta.title, &template)
-      meta.add(title: title) if title.present?
-    end
-
-    def merge_meta_tags!(props)
-      apply_title_template
-      return if meta_tags.blank?
-
-      props[@configuration.meta_prop] = serialized_meta_tags
-    end
-
-    def serialized_meta_tags
-      return meta_tags unless @configuration.server_head
-
-      attribute = @configuration.head_attribute
-      meta_tags.map { |tag| tag.to_tag(inertia_attribute: attribute) }
-    end
-
-    def validate_meta_prop!
-      return unless @configuration.server_head
-
-      prop = @configuration.meta_prop
-      return unless @props.key?(prop)
-
-      raise Error, "The `#{prop}` prop is reserved by `config.server_head`. " \
-                   'Rename the conflicting prop, or set `config.server_head` to a custom prop name.'
-    end
-
-    def wrap_errors_prop!(props)
-      return unless props.key?(:errors) && !props[:errors].is_a?(Inertia::Core::Prop)
-
-      errors = props[:errors]
-      props[:errors] = InertiaRails.always { errors }
     end
   end
 end

@@ -1,5 +1,6 @@
 # frozen_string_literal: true
 
+require 'cgi'
 require 'uri'
 
 module Inertia
@@ -33,6 +34,22 @@ module Inertia
       # JSON safe to embed inside a `<script>` element.
       def script_json(json)
         json.gsub(SCRIPT_TERMINATOR, '<\/')
+      end
+
+      # What the client boots from on a first load: the page JSON in a
+      # `<script>` next to an empty root, or the root itself carrying the page
+      # in `data-page`.
+      def root_element(page, id:, script: false, nonce: nil)
+        json = page.to_json
+        return %(<div id="#{escape_html(id)}" data-page="#{escape_html(json)}"></div>) unless script
+
+        attributes = %(data-page="#{escape_html(id)}" type="application/json")
+        attributes += %( nonce="#{escape_html(nonce)}") if nonce
+        %(<script #{attributes}>#{script_json(json)}</script>\n<div id="#{escape_html(id)}"></div>)
+      end
+
+      def escape_html(value)
+        CGI.escapeHTML(value.to_s)
       end
 
       # Tells the client to make a full page visit to `url`.

@@ -11,6 +11,8 @@ require_relative 'core/xsrf_cookie'
 require_relative 'core/configuration'
 require_relative 'core/protocol'
 require_relative 'core/page'
+require_relative 'core/meta_tag'
+require_relative 'core/meta_tag_builder'
 require_relative 'core/raw_json'
 require_relative 'core/container'
 require_relative 'core/scroll_metadata'
@@ -49,6 +51,7 @@ require_relative 'core/rack'
 require_relative 'core/rack/request'
 require_relative 'core/rack/middleware'
 require_relative 'core/precognition'
+require_relative 'core/response'
 
 module Inertia
   # The framework-agnostic half of the Inertia protocol: prop types, their
