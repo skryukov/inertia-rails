@@ -1,7 +1,7 @@
 # frozen_string_literal: true
 
 # The tag's wire form and markup are specified in the core suite
-# (spec/core/meta_tag_spec.rb); this is the Rails signature.
+# (gems/inertia-core/spec/meta_tag_spec.rb); this is the Rails signature.
 RSpec.describe InertiaRails::MetaTag do
   let(:meta_tag) { described_class.new(head_key: dummy_head_key, name: 'description', content: 'Inertia rules') }
   let(:dummy_head_key) { 'meta-12345678' }

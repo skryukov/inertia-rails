@@ -1,6 +1,0 @@
---format documentation
---color
-# The unit suite is spec/core. spec/core/hosts mounts real web frameworks, and
-# with them Rack, whose presence `Inertia::Core::Rack.header_name` reads — so the
-# matrix is a pass of its own: `rspec -O spec/core/.rspec spec/core/hosts`.
---exclude-pattern hosts/**/*_spec.rb
