@@ -5,6 +5,10 @@ module InertiaRails
   class Middleware < Inertia::Core::Rack::Middleware
     protected
 
+    def recorder_for(env)
+      Devtools.start(env)
+    end
+
     def call_app(env)
       if prevent_precognition_writes?(env)
         ActiveRecord::Base.while_preventing_writes { super }

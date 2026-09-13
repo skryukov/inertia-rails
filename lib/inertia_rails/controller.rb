@@ -43,6 +43,12 @@ module InertiaRails
       end
 
       def inertia_config(**attrs)
+        global = attrs.keys & Configuration::GLOBAL_OPTION_NAMES
+        if global.any?
+          raise ArgumentError,
+                "#{global.join(', ')} cannot be set per controller — set them via InertiaRails.configure instead."
+        end
+
         config = InertiaRails::Configuration.new(**attrs)
 
         if @inertia_config

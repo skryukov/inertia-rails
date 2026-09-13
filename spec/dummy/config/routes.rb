@@ -3,6 +3,14 @@
 Rails.application.routes.draw do
   mount InertiaRails::Engine => '/inertia-rails'
 
+  get 'devtools_props' => 'inertia_devtools_test#props', as: :devtools_props
+  get 'devtools_rescued' => 'inertia_devtools_test#rescued', as: :devtools_rescued
+  get 'devtools_plain' => 'inertia_devtools_test#plain', as: :devtools_plain
+  post 'devtools_create' => 'inertia_devtools_test#create', as: :devtools_create
+  get 'devtools_boom' => 'inertia_devtools_test#boom', as: :devtools_boom
+  get 'devtools_oversized' => 'inertia_devtools_test#oversized', as: :devtools_oversized
+  get 'devtools_cached' => 'inertia_devtools_test#cached', as: :devtools_cached
+
   get 'configuration' => 'inertia_config_test#configuration'
   get 'props' => 'inertia_render_test#props'
   get 'ssr_cache_disabled' => 'inertia_render_test#ssr_cache_disabled'

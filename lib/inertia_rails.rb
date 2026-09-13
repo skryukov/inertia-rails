@@ -32,6 +32,9 @@ require_relative 'inertia_rails/meta_tag'
 require_relative 'inertia_rails/meta_tag_builder'
 require_relative 'inertia_rails/renderer'
 
+# devtools
+require_relative 'inertia_rails/devtools'
+
 # rails integration
 require_relative 'inertia_rails/flash_extension'
 require_relative 'inertia_rails/helper'

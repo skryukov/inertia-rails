@@ -2,8 +2,8 @@
 
 module InertiaRails
   # What only Rails knows about a render — shared data, view assigns, the
-  # session's history flags, the flash, the layout, the meta DSL — handed to
-  # the core's Response, whose answer Rails' `render` writes out.
+  # session's history flags, the flash, the layout, the meta DSL, DevTools —
+  # handed to the core's Response, whose answer Rails' `render` writes out.
   class Renderer
     %i[component configuration controller props view_data encrypt_history
        clear_history].each do |method_name|
@@ -42,6 +42,7 @@ module InertiaRails
       @props = Inertia::Core::PropsMerger.merge(shared, passed_props, deep: deep_merge)
 
       @component = resolve_component(component)
+      start_devtools_render(shared)
 
       @controller.instance_variable_set('@_inertia_rendering', true)
       controller.inertia_meta.add(options[:meta]) if options[:meta]
@@ -52,7 +53,7 @@ module InertiaRails
                                               component: @component, partial: inertia.partial?, ssr: false) do |payload|
         @response.headers.merge!(inertia.headers(@response.headers['Vary']))
         if inertia.json?
-          @render_method.call json: inertia.json, status: @response.status, content_type: Mime[:json]
+          @render_method.call json: page.to_json, status: @response.status, content_type: Mime[:json]
         elsif inertia.ssr?
           payload[:ssr] = true
           @controller.instance_variable_set('@_inertia_ssr_head', inertia.head.html_safe)
@@ -85,16 +86,26 @@ module InertiaRails
     end
 
     def page
-      inertia.page
+      @page ||= inertia.page.tap { |page| devtools&.page_rendered(page, inertia.metadata) }
     end
 
     def locals
       @view_data.merge(page: page)
     end
 
-    # The adapter's say over resolution: the testing helpers turn on `eager:` here.
+    # The adapter's say over resolution: the testing helpers turn on `eager:` here too.
     def resolver_options
-      {}
+      collector = devtools&.collector
+      collector ? { observer: collector } : {}
+    end
+
+    def devtools
+      @devtools = Devtools.recorder(@request) unless defined?(@devtools)
+      @devtools
+    end
+
+    def start_devtools_render(shared)
+      devtools&.render_started(component: @component, shared_keys: extract_shared_keys(shared))
     end
 
     def layout
