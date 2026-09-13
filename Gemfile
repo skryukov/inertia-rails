@@ -17,7 +17,7 @@ gem 'rake', '~> 13.0'
 gem 'responders'
 gem 'rspec-rails', '~> 6.0'
 gem 'rubocop', '~> 1.21'
-gem 'sqlite3'
+gem 'sqlite3', version.to_f < 7.1 ? '~> 1.4' : '>= 2.0'
 
 gem 'kaminari'
 gem 'pagy'

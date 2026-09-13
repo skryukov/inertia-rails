@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 * Add testing helpers for scroll props and once props (@onk)
 * Add `config.server_head` to serialize meta tags as HTML strings into the `head` prop for the `serverHead` option of `createInertiaApp` (Inertia.js v3.5+), replacing the client-side cookbook component (@skryukov)
 * Add `meta_title_template` configuration option — a callable applied to the `<title>` tag of server driven meta tags; it receives the current title (or `nil`) and can provide a default for pages without one (@skryukov)
+* Apply the `to_inertia` protocol to array elements, and implement it on `ActiveRecord::Relation` as `to_a`, so a record's `to_inertia` fires inside `users: User.all` just as it does inside a plain array (@skryukov)
 * Add `ActiveSupport::Notifications` instrumentation: `render.inertia_rails`, `resolve_props.inertia_rails`, and `ssr.inertia_rails` events (@skryukov)
 * Convert external (cross-origin) redirects to Inertia location responses automatically (disable with `config.convert_external_redirects = false`), and add `redirect_to url, inertia: { full_page: true }` for same-origin redirects to non-Inertia endpoints (@skryukov)
 * Read the origin the client reached from the headers a proxy forwards (`X-Forwarded-Proto`, `X-Forwarded-Host`, `X-Forwarded-Port`) when deciding whether a redirect leaves the app and when sending a stale client back to its URL, so same-origin redirects behind a proxy are no longer turned into full page visits (@skryukov)

@@ -1047,6 +1047,24 @@ RSpec.describe InertiaRails::PropsResolver do
       expect(page[:props][:auth][:user]).to eq({ name: 'Jonathan' })
     end
 
+    it 'resolves objects responding to to_inertia inside an array' do
+      serializer = Object.new
+      def serializer.to_inertia = { name: 'Jonathan' }
+
+      page = resolve({ users: [serializer, { name: 'Claudia' }] })
+
+      expect(page[:props][:users]).to eq([{ name: 'Jonathan' }, { name: 'Claudia' }])
+    end
+
+    it 'resolves prop types returned by a to_inertia object inside an array' do
+      serializer = Object.new
+      def serializer.to_inertia = { name: 'Jonathan', permissions: InertiaRails.optional { ['admin'] } }
+
+      page = resolve({ users: [serializer] })
+
+      expect(page[:props][:users]).to eq([{ name: 'Jonathan' }])
+    end
+
     it 'resolves to_inertia object with prop types inside' do
       serializer = Object.new
       def serializer.to_inertia

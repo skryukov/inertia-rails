@@ -40,6 +40,15 @@ module InertiaRails
       ActionDispatch::Flash::FlashNow.prepend ::InertiaRails::FlashExtension
     end
 
+    initializer 'inertia_rails.active_record' do
+      ActiveSupport.on_load(:active_record) do
+        require_relative 'extensions/active_record'
+        unless ActiveRecord::Relation.method_defined?(:to_inertia)
+          ActiveRecord::Relation.include ::InertiaRails::InertiaRelation
+        end
+      end
+    end
+
     initializer 'inertia_rails.request' do
       require_relative 'extensions/request'
       ActionDispatch::Request.include ::InertiaRails::InertiaRequest

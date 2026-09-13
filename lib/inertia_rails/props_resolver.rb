@@ -147,12 +147,14 @@ module InertiaRails
 
       array.each_with_index.map do |item, index|
         item_path = "#{path}.#{index}"
+        excluded = !parent_was_resolved && excluded_by_partial_request?(item_path)
+        item = item.to_inertia if !excluded && item.respond_to?(:to_inertia)
 
         case item
         when Hash then deep_transform_props(item, item_path, parent_was_resolved: parent_was_resolved)
         when Array then transform_array(item, item_path, parent_was_resolved: parent_was_resolved)
         else
-          @evaluator.call(item) unless !parent_was_resolved && excluded_by_partial_request?(item_path)
+          @evaluator.call(item) unless excluded
         end
       end
     end
