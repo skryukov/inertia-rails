@@ -1,10 +1,13 @@
 # Inertia::Core
 
 The framework-agnostic half of the [Inertia.js](https://inertiajs.com) server
-protocol: the page object, the configuration knobs, the Rack middleware, the
-SSR client, and the request/response decisions every adapter makes the same
-way. Plain Ruby, stdlib only (`json`, `uri`, `net/http`, `digest`). `inertia_rails` is one adapter built on it; another framework's adapter
-is a `Host`, a `Configuration`, and a render helper.
+protocol: prop types, their resolution against a visit, the page object, the
+configuration knobs, the Rack middleware, the SSR client, and the
+request/response decisions every adapter makes the same way. Plain Ruby,
+stdlib only (`json`, `uri`, `net/http`, `digest`). `inertia_rails` is one
+adapter built on it; another framework's adapter is a `Host`, a
+`Configuration`, and a render helper. How the walk works is in
+[DESIGN.md](DESIGN.md).
 
 ```ruby
 require 'inertia/core'
@@ -62,6 +65,62 @@ one through `super`. `evaluate: false` hands a callable back uncalled, for the
 options a render invokes itself (`on_ssr_error`, `meta_title_template`).
 Options stay sparse: `merge` and `merge!` combine two, `with_defaults(parent)`
 finalizes a layered one and freezes it.
+
+### 3. An evaluation context per request
+
+Prop blocks run via `instance_exec` inside an object the adapter chooses — the
+controller in Rails, the action or app instance elsewhere — and the host goes
+with it, so two adapters in one process cannot step on each other:
+
+```ruby
+evaluator = Inertia::Core::PropEvaluator.new(context, host: host)
+```
+
+## Resolving props
+
+```ruby
+visit = Inertia::Core::Visit.from_env(env, component: 'Dashboard')   # or from_headers(headers, component:)
+props, metadata = Inertia::Core::PropsResolver.new(props, evaluator: evaluator, visit: visit).resolve
+Inertia::Core::Page.new(component: 'Dashboard', props: props, metadata: metadata, url: url, ...).to_h
+```
+
+- `props` values may be plain data, closures, serializers (`to_inertia`, or a
+  container with its own `as_json`), or prop types, at any depth. Merge shared
+  props in first with `PropsMerger.merge(shared, props, deep:)`, which keeps
+  one spelling per key and leaves serializers whole. Top-level String keys
+  containing dots expand (`'user.name' => ...`).
+- `Visit.from_headers(headers, component:)` takes anything answering `[]`
+  with canonical names (`X-Inertia-Partial-Data`, `-Partial-Except`,
+  `-Partial-Component`, `X-Inertia-Reset`, `-Except-Once-Props`,
+  `-Infinite-Scroll-Merge-Intent`); `from_env` reads the `HTTP_*` keys.
+- Every prop type takes keyword options plus a block (or `value:`);
+  `CachedProp` takes its key positionally:
+
+  ```ruby
+  OptionalProp.new(**options, &block)                       # cache:, once:, merge: families
+  DeferProp.new(group: 'default', rescue: false, **, &block)
+  MergeProp.new(deep_merge: false, match_on:, append:, prepend:, **, &block)
+  OnceProp.new(key: nil, expires_in: nil, fresh: false, **, &block)
+  AlwaysProp.new(value: ...)
+  CachedProp.new('key_or_array_or_record', **store_options, &block)
+  ScrollProp.new(metadata: pagination, wrapper:, group:, defer:, optional:, **, &block)
+  ```
+
+  Invalid combinations raise `ArgumentError` at construction; shapes the walk
+  cannot ship (a prop type produced by another, a prop at an array index, a
+  producer that never settles) raise `ResolutionError` while resolving.
+- `metadata` is the hash of page-object keys the client understands
+  (`deferredProps`, `mergeProps`, `prependProps`, `deepMergeProps`,
+  `matchPropsOn`, `onceProps`, `scrollProps`, `rescuedProps`). `Page` merges
+  it; `extensions:` merges an adapter's own keys the same way.
+- `eager: true` resolves deferred and optional props on a full load (for
+  tests); `observer:` is an `Inertia::Core::Observer` subclass whose
+  `walked(ledger)` receives the `Inertia::Core::Ledger` once the walk is done:
+  every prop met with its verdict, and every rescued error. The page metadata
+  is derived from the same ledger.
+- `ScrollMetadata.register_adapter(klass)` adds a pagination adapter
+  (`match?(metadata)`, `call(metadata, **options)`, optional
+  `accepted_options`); the core ships only the Hash and bare-fields forms.
 
 ## The page object
 

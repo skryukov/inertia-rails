@@ -12,17 +12,21 @@ module Inertia
         value.is_a?(::Hash) || value.is_a?(::Array)
       end
 
+      # One whose class or singleton answers `as_json` itself. The base's own
+      # (ActiveSupport puts one on `Hash` and `Array`) is inherited, so a bare
+      # subclass sends what its base would; plain Ruby gives the base none,
+      # so there any answer is the value's own.
       def opaque?(value)
         base = base_of(value)
-        return false unless base&.method_defined?(:as_json)
+        return false unless base && value.respond_to?(:as_json)
 
         value.method(:as_json).owner != as_json_owner(base)
       end
 
-      # ActiveSupport's, once the host loaded it: the same for every value of
-      # a base, so looked up once. A racing write stores the same owner.
+      # The base's, or nil while it has none: the same for every value of a
+      # base, so looked up once it exists. A racing write stores the same owner.
       def as_json_owner(base)
-        (@as_json_owners ||= {})[base] ||= base.instance_method(:as_json).owner
+        (@as_json_owners ||= {})[base] ||= (base.instance_method(:as_json).owner if base.method_defined?(:as_json))
       end
 
       # A container the walk may reach into and hand back rebuilt.
