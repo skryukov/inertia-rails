@@ -13,6 +13,7 @@ RSpec.describe InertiaRails, 'prop helpers' do
     expect(described_class.merge { 1 }).to be_an_instance_of(Inertia::Core::MergeProp)
     expect(described_class.defer { 1 }).to be_an_instance_of(Inertia::Core::DeferProp)
     expect(described_class.cache('k') { 1 }).to be_an_instance_of(Inertia::Core::CachedProp)
+    expect(described_class.live(on: 'E', channel: 'c') { 1 }).to be_an_instance_of(Inertia::Core::LiveProp)
     expect(described_class.lazy(1)).to be_an_instance_of(InertiaRails::LazyProp)
   end
 
@@ -25,5 +26,12 @@ RSpec.describe InertiaRails, 'prop helpers' do
       .to eq('key' => { pageName: 'page', previousPage: nil, nextPage: 2, currentPage: 1, reset: false })
     expect(announced(described_class.defer(group: 'sidebar') { 1 }))
       .to include(deferredProps: { 'sidebar' => ['key'] })
+  end
+
+  it 'wraps broadcast props in the __inertia envelope, running blocks in the context' do
+    context = Class.new { def name = 'ctx' }.new
+
+    expect(described_class.broadcast_props({ who: -> { name } }, context: context))
+      .to eq('__inertia' => { 'props' => { 'who' => 'ctx' } })
   end
 end

@@ -102,5 +102,16 @@ module InertiaRails
     def scroll(metadata = nil, **options, &block)
       ScrollProp.new(metadata: metadata, **options, &block)
     end
+
+    def live(...)
+      LiveProp.new(...)
+    end
+
+    # The `__inertia` envelope a broadcast carries so the client writes the
+    # props straight into the page instead of reloading them. Blocks run in
+    # `context` (a controller-like object) when given.
+    def broadcast_props(props, context: Object.new)
+      Inertia::Core::Broadcast.props(props, evaluator: PropEvaluator.new(context, host: host))
+    end
   end
 end

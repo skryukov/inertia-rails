@@ -12,6 +12,7 @@ module InertiaRails
   OnceProp = Inertia::Core::OnceProp
   CachedProp = Inertia::Core::CachedProp
   ScrollProp = Inertia::Core::ScrollProp
+  LiveProp = Inertia::Core::LiveProp
   ScrollMetadata = Inertia::Core::ScrollMetadata
   RawJson = Inertia::Core::RawJson
   PropEvaluator = Inertia::Core::PropEvaluator

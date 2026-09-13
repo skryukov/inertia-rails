@@ -13,7 +13,7 @@ module Inertia
 
       # What this prop tells the client about itself, read by the metadata
       # contributors once the walk is done.
-      attr_reader :cache, :defer, :merge, :once, :scroll
+      attr_reader :cache, :defer, :merge, :once, :live, :scroll
 
       def initialize(**options, &block)
         @options = Options.new(self.class.preset, options)
@@ -25,6 +25,7 @@ module Inertia
         @defer = Announcements::Defer.new(group: @options[:group]) if @options.defers?
         @merge = build_merge
         @once = Announcements::Once.new(**@options.once_parts) if @options.onces?
+        @live = Announcements::Live.new(@options[:live]) if @options.on?(:live)
         @scroll = nil
       end
 

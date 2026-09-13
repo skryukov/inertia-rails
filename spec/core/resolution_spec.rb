@@ -73,4 +73,37 @@ RSpec.describe Inertia::Core::PropsResolver do
       expect(rescued).to eq [%w[b x]]
     end
   end
+
+  describe 'live props' do
+    let(:listener) { { channel: { name: 'chat.1', type: 'public' }, events: ['MessageCreated'] } }
+
+    it 'announces liveProps whether or not the value ships' do
+      props = {
+        live: Inertia::Core::LiveProp.new(on: 'MessageCreated', channel: 'chat.1') { [1] },
+        deferred: Inertia::Core::DeferProp.new(live: { on: 'MessageCreated', channel: 'chat.1' }) { [2] },
+      }
+      announced = { 'live' => { listeners: [listener] }, 'deferred' => { listeners: [listener] } }
+
+      resolved, first = resolve(props)
+      expect(resolved).to eq(live: [1])
+      expect(first[:liveProps]).to eq(announced)
+
+      resolved, follow_up = resolve(props, { partial: true, only: ['deferred'] })
+      expect(resolved).to eq(deferred: [2])
+      expect(follow_up[:liveProps]).to eq(announced)
+    end
+
+    it 'refuses a broadcast prop named twice, as a String and a Symbol' do
+      expect { Inertia::Core::Broadcast.props({ 'a' => 1, a: 2 }, evaluator: evaluator) }
+        .to raise_error(Inertia::Core::ResolutionError, /same path twice/)
+    end
+
+    it 'builds the __inertia push envelope with every value resolved' do
+      payload = Inertia::Core::Broadcast.props(
+        { count: -> { 1 }, later: Inertia::Core::DeferProp.new { 2 }, 'a.b' => 3 }, evaluator: evaluator
+      )
+
+      expect(payload).to eq('__inertia' => { 'props' => { 'count' => 1, 'later' => 2, 'a.b' => 3 } })
+    end
+  end
 end

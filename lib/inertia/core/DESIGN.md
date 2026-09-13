@@ -22,9 +22,9 @@ literal hash, `nil` otherwise).
 | `Cursor` | Where the walk is: `path`, `depth`, `reload`, `in_array?`, `cached?`. Immutable; `at(key)` makes the child, `unfiltered` drops the filter, `cached` starts inside a cached value. |
 | `Slot` | A prop key: its value and the dotted keys written underneath it. `Slot.tree(props)` expands dot notation once; two spellings of one path are refused. |
 | `Container` | The one question the walk, the merger and the array placeholder ask of a Hash or an Array: may it be rebuilt (`plain?`), or does it serialize itself (`opaque?`)? |
-| `Prop` | A producer (`produce(evaluator)`), what it announces (`cache`, `defer`, `merge`, `once`, `scroll`), and one rule: `decide(visit, path, eager:, excluded:)` → `:delivered`, `:held`, `:omitted` or `:silenced`. The presets lock one option each. |
+| `Prop` | A producer (`produce(evaluator)`), what it announces (`cache`, `defer`, `merge`, `once`, `live`, `scroll`), and one rule: `decide(visit, path, eager:, excluded:)` → `:delivered`, `:held`, `:omitted` or `:silenced`. The presets lock one option each. |
 | `Prop::Options` | Reads the option hash once: refuses unknown names, contradictions, reverse spellings and orphaned sub-options; hands out the parts. |
-| `Prop::Announcements::{Defer,Merge,Once,Scroll}` | What a prop tells the client, frozen at construction. Each also knows how to `contribute` its page key from a ledger. |
+| `Prop::Announcements::{Defer,Merge,Once,Live,Scroll}` | What a prop tells the client, frozen at construction. Each also knows how to `contribute` its page key from a ledger. |
 | `Prop::Cache` | A cache key and its store options. |
 | `Ledger` / `Ledger::Entry` | The record of one walk: every prop met (path, prop, verdict, reset) in order, and every error a `rescue:` prop swallowed. Only the walk writes it. |
 | `Metadata` | The page's second half, derived from the ledger after the walk: one contributor per key, empty lists never ship. |

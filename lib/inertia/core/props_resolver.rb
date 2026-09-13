@@ -94,8 +94,8 @@ module Inertia
       # An excluded position is never evaluated: a closure or serializer stays
       # unrun and plain data is dropped. A literal container is still looked
       # through for the props written inside it, so the ledger records every
-      # prop the page carries — an observer sees what was silenced, not only
-      # what shipped.
+      # prop the page carries: a live prop announces its listeners whatever
+      # the visit says about the path, and an observer sees what was silenced.
       def walk_excluded(value, cursor)
         silence(value, cursor) if Container.holds_prop?(value, MAX_DEPTH)
         DROPPED

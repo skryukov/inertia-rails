@@ -14,6 +14,7 @@ module Inertia
           **Prop::Announcements::Merge.contribute(ledger, visit),
           **Prop::Announcements::Once.contribute(ledger, visit),
           **Prop::Announcements::Scroll.contribute(ledger, visit),
+          **Prop::Announcements::Live.contribute(ledger, visit),
           rescuedProps: ledger.rescues.map(&:path),
         }.reject { |_key, announced| announced.empty? }
       end

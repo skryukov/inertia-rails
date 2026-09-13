@@ -97,13 +97,14 @@ Inertia::Core::Page.new(component: 'Dashboard', props: props, metadata: metadata
   `CachedProp` takes its key positionally:
 
   ```ruby
-  OptionalProp.new(**options, &block)                       # cache:, once:, merge: families
+  OptionalProp.new(**options, &block)                       # cache:, once:, merge:, live: families
   DeferProp.new(group: 'default', rescue: false, **, &block)
   MergeProp.new(deep_merge: false, match_on:, append:, prepend:, **, &block)
   OnceProp.new(key: nil, expires_in: nil, fresh: false, **, &block)
   AlwaysProp.new(value: ...)
   CachedProp.new('key_or_array_or_record', **store_options, &block)
   ScrollProp.new(metadata: pagination, wrapper:, group:, defer:, optional:, **, &block)
+  LiveProp.new(on: 'MessageCreated', channel: 'chat.1', throttle: nil, &block)
   ```
 
   Invalid combinations raise `ArgumentError` at construction; shapes the walk
@@ -111,10 +112,10 @@ Inertia::Core::Page.new(component: 'Dashboard', props: props, metadata: metadata
   producer that never settles) raise `ResolutionError` while resolving.
 - `metadata` is the hash of page-object keys the client understands
   (`deferredProps`, `mergeProps`, `prependProps`, `deepMergeProps`,
-  `matchPropsOn`, `onceProps`, `scrollProps`, `rescuedProps`). `Page` merges
+  `matchPropsOn`, `onceProps`, `scrollProps`, `liveProps`, `rescuedProps`). `Page` merges
   it; `extensions:` merges an adapter's own keys the same way.
 - `eager: true` resolves deferred and optional props on a full load (for
-  tests); `observer:` is an `Inertia::Core::Observer` subclass whose
+  tests and broadcasts); `observer:` is an `Inertia::Core::Observer` subclass whose
   `walked(ledger)` receives the `Inertia::Core::Ledger` once the walk is done:
   every prop met with its verdict, and every rescued error. The page metadata
   is derived from the same ledger.
@@ -192,6 +193,13 @@ reports a failure through `Host#report_error(error, ssr: true, component:)`:
 ```ruby
 Inertia::Core::SSR::Client.new(config, page: page, host: host).render
 # => { 'head' => [...], 'body' => '...' } or nil
+```
+
+## Broadcasting live props
+
+```ruby
+payload = Inertia::Core::Broadcast.props({ messages: -> { room.messages } }, evaluator: evaluator)
+# => { '__inertia' => { 'props' => { 'messages' => [...] } } }  — embed in the broadcast event
 ```
 
 ## Errors

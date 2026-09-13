@@ -115,6 +115,13 @@ RSpec.describe Inertia::Core::Prop, 'option handling' do
       expect { Inertia::Core::ScrollProp.new(metadata: page, cache: 'k') { [1] } }
         .to raise_error(ArgumentError, /not supported on scroll props.*keying on the page/m)
     end
+
+    it 'refuses live on scroll props instead of forwarding it to the adapters' do
+      page = { page_name: 'p', previous_page: nil, next_page: 2, current_page: 1 }
+
+      expect { Inertia::Core::ScrollProp.new(metadata: page, live: { on: 'E', channel: 'c' }) { [1] } }
+        .to raise_error(ArgumentError, /`live:` is not supported on scroll props/)
+    end
   end
 
   describe 'rescue option scope' do

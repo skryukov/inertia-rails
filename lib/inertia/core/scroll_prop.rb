@@ -12,7 +12,7 @@ module Inertia
 
       # Options that contradict paging: the direction is the client's to pick,
       # the value changes every request, and there is nothing to hold back.
-      UNSUPPORTED = %i[merge append prepend once always fresh expires_in value cache].freeze
+      UNSUPPORTED = %i[merge append prepend once always fresh expires_in value cache live].freeze
 
       def self.preset
         :scroll
